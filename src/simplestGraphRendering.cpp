@@ -94,11 +94,11 @@ namespace Mat4
 struct Node
 {
 	Node() : lat(0), lon(0) {}
-	Node(uint i, double la, double lo, int e) :
+	Node(double la, double lo) :
 	lat(la), lon(lo) {}
 
-	float lat;
-	float lon;
+	double lat;
+	double lon;
 };
 
 /**
@@ -112,10 +112,9 @@ struct Edge
 
 	uint source;
 	uint target;
-	float width;
+	uint width;
 	int color;
 };
-
 
 /*
  * Each vertex contains the geo coordinates of a node and the color properties of adjacent edges.
@@ -127,7 +126,7 @@ struct Vertex
 
 	float longitude;
 	float latitude;
-	int color;
+	float color;
 };
 
 struct OrbitalCamera
@@ -267,8 +266,6 @@ struct GfxGraph
 		// Each edge contributes two indices
 		indices.reserve(edges.size()*2);
 
-		std::vector<bool> visited(nodes.size());
-
 		// Copy geo coordinates from input nodes to vertices
 		for(auto& node : nodes)
 		{
@@ -278,22 +275,79 @@ struct GfxGraph
 		std::sort(edges.begin(),edges.end(), [](Edge u, Edge v) { return u.width < v.width; } );
 
 		// Copy indices from edge array to index array
-		float width = 0.0;
+		std::vector<bool> has_next(nodes.size(), false);
+		std::vector<uint> next(nodes.size(),0);
+		uint width = 0.0;
 		uint counter = 0;
 		for(auto& edge : edges)
 		{
-			if(width != edge.width) //probably shouldn't do that with floats...
+			uint src_id = edge.source;
+			uint tgt_id = edge.target;
+			
+			while(has_next[src_id] && (vertices[src_id].color != edge.color))
+			{
+				src_id = next[src_id];
+			}
+
+			if(vertices[src_id].color == -1)
+			{
+				vertices[src_id].color = edge.color;
+			}
+
+			if(vertices[src_id].color != edge.color)
+			{
+				uint next_id = vertices.size();
+				vertices.push_back(Vertex(vertices[src_id].longitude,vertices[src_id].latitude));
+				vertices[next_id].color = edge.color;
+				has_next.push_back(false);
+				next.push_back(0);
+			
+				next[src_id] = next_id;
+				has_next[src_id] = true;
+				src_id = next_id;
+			}
+
+			while(has_next[tgt_id] && (vertices[tgt_id].color != edge.color))
+			{
+				tgt_id = next[tgt_id];
+			}
+
+			if(vertices[tgt_id].color == -1)
+			{
+				vertices[tgt_id].color = edge.color;
+			}
+
+			if(vertices[tgt_id].color != edge.color)
+			{
+				uint next_id = vertices.size();
+				vertices.push_back(Vertex(vertices[tgt_id].longitude,vertices[tgt_id].latitude));
+				vertices[next_id].color = edge.color;
+				has_next.push_back(false);
+				next.push_back(0);
+			
+				next[tgt_id] = next_id;
+				has_next[tgt_id] = true;
+				tgt_id = next_id;
+			}
+
+			//std::cout<<"Edge color: "<<edge.color<<std::endl;
+			//std::cout<<"Source color: "<<vertices[src_id].color<<std::endl;
+			//std::cout<<"Target color: "<<vertices[tgt_id].color<<std::endl;
+
+			if(width != edge.width)
 			{
 				index_offsets.push_back(counter);
-				line_widths.push_back(edge.width);
+				line_widths.push_back((float)edge.width);
 				width = edge.width;
 			}
 
-			indices.push_back(edge.source);
-			indices.push_back(edge.target);
+			indices.push_back(src_id);
+			indices.push_back(tgt_id);
 
 			counter += 2;
 		}
+
+		std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
 	}
 
 	/**
@@ -326,11 +380,9 @@ struct GfxGraph
 		glBindVertexArray(va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
 		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(GL_FLOAT)*2, 0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), 0);
 		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 1, GL_FLOAT, false, sizeof(GL_FLOAT)*1, (GLvoid*) (sizeof(GL_FLOAT)*2));
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 1, GL_INT, false, sizeof(GL_INT)*1, (GLvoid*) (sizeof(GL_FLOAT)*3));
+		glVertexAttribPointer(1, 1, GL_FLOAT, false, sizeof(Vertex), (GLvoid*) (sizeof(GL_FLOAT)*2));
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
@@ -348,8 +400,12 @@ struct GfxGraph
 	 */
 	void draw()
 	{
+		//glBindVertexArray(va_handle);
+		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
+
 		for(int i=0; i< index_offsets.size()-1; i++)
 		{
+			// TODO account for camera height / zoom level
 			glLineWidth(line_widths[i]);
 			glBindVertexArray(va_handle);
 			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
@@ -659,7 +715,7 @@ namespace Controls {
 	{
 		OrbitalCamera* active_camera = reinterpret_cast<OrbitalCamera*>(glfwGetWindowUserPointer(window));
 
-		float camera_height_inertia = std::pow( (active_camera->orbit - 1.0f )*0.5f, 1.0);
+		float camera_height_inertia = std::pow( (active_camera->orbit - 1.0f )*0.1f, 1.0);
 		
 		active_camera->moveInOrbit(0.0,0.0,-camera_height_inertia * (float)y_offset);
 	}
@@ -679,7 +735,7 @@ namespace Controls {
 			//camera_lon += cursor_movement.x;
 			//camera_lat -= cursor_movement.y;
 	
-			GLfloat camera_vertical_inertia = std::pow( (active_camera->orbit - 1.0)*0.5, 0.5f);
+			GLfloat camera_vertical_inertia = std::pow( (active_camera->orbit - 1.0)*0.1, 1.2f);
 	
 			active_camera->moveInOrbit(-cursor_movement[1]*camera_vertical_inertia,cursor_movement[0]*camera_vertical_inertia,0.0);
 		}
@@ -689,8 +745,120 @@ namespace Controls {
 
 }
 
-int main(void)
+/*
+ * Collection of functions for parsing graph files. Taken from lasagne and modified to meet expected graph input format
+ */
+namespace Parser
 {
+	/**
+	 * Creates a new graph node
+	 * @param input_string Input string containing node data
+	 * @param r_node Node created from input string
+	 */
+	void createNode(std::string input_string, Node& r_node)
+	{
+		std::stringstream ss(input_string);
+		std::string buffer;
+
+		ss >> buffer;
+		r_node.lat = atof(buffer.c_str());
+
+		ss >> buffer;
+		r_node.lon = atof(buffer.c_str());
+	}
+
+	/**
+	 * createEdge - erstellt eine neue Kante
+	 * @param input_string Input string containing edge data
+	 * @param r_edge Edge created from input string
+	 */
+	void createEdge(std::string input_string, Edge& r_edge)
+	{
+		std::stringstream ss(input_string);
+		std::string buffer;
+
+		ss >> buffer;
+		r_edge.source = (uint)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.target = (uint)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.width = (uint)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.color = (int)atoi(buffer.c_str());
+	}
+
+	/**
+	 * Parse node and egde from input file
+	 * @param graphfile Path to the graphfile
+	 * @param n Vector for storing the parsed nodes
+	 * @param e Vector for storing the parsed edges
+	 */
+	bool parseTxtGraphFile(std::string graphfile, std::vector<Node>& n, std::vector<Edge>& e)
+	{
+		std::string buffer;
+		std::ifstream file;
+
+		file.open(graphfile.c_str(), std::ios::in);
+
+		if( file.is_open())
+		{
+			file.seekg(0, std::ios::beg);
+			getline(file,buffer,'\n');
+			uint node_count = (uint)atoi(buffer.c_str());
+			getline(file,buffer,'\n');
+			uint edge_count = (uint)atoi(buffer.c_str());
+
+			n.reserve(node_count);
+			for(uint i=0; i<node_count; i++)
+			{
+				getline(file,buffer,'\n');
+				n.push_back(Node());
+				createNode(buffer, n.back() );
+			}
+
+			e.reserve(edge_count);
+			for(uint j=0; j<edge_count; j++)
+			{
+				getline(file,buffer,'\n');
+				e.push_back(Edge());
+				createEdge(buffer, e.back() );
+			}
+			file.close();
+
+			return true;
+		}
+
+		return false;
+	}
+}
+
+int main(int argc, char*argv[])
+{
+	/////////////////////////////////////
+	// overly simple command line parsing
+	/////////////////////////////////////
+
+	std::string filepath;
+
+	int i=0;
+	while(i<argc)
+	{
+		if(argv[i] == (std::string) "-gf")
+		{
+			i++;
+			if(i<argc) { filepath = argv[i]; }
+			else { std::cout<<"Missing parameter for -gf"<<std::endl; return 0; }
+		}
+		else
+		{
+			i++;
+		}
+	}
+
+
 	/////////////////////////////////////
 	// Window and OpenGL Context creation
 	/////////////////////////////////////
@@ -730,6 +898,8 @@ int main(void)
 	/* Intialize controls */
 	glfwSetWindowSizeCallback(window,windowSizeCallback);
 	glfwSetScrollCallback(window, Controls::mouseScrollFeedback);
+	/* Hide cursor */
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
 
 	////////////////////////////
@@ -738,6 +908,8 @@ int main(void)
 
 	std::vector<Node> nodes;
 	std::vector<Edge> edges;
+
+	Parser::parseTxtGraphFile(filepath,nodes,edges);
 
 
 	/////////////////////////////////////////////////////////////////////
@@ -751,23 +923,23 @@ int main(void)
 	 */
 
 	/* Create GLSL program */
-	//GLuint shader_prgm_handle = createShaderProgram();
+	GLuint shader_prgm_handle = createShaderProgram();
 	GLuint debug_prgm_handle = createDebugShaderProgram();
 
-	GLenum glerror = glGetError();
-	std::cout<<glerror<<std::endl;
+	//GLenum glerror = glGetError();
+	//std::cout<<glerror<<std::endl;
 
 	/* Create renderable graph (mesh) */
-	//GfxGraph lineGraph;
-	//lineGraph.convertGraphData(nodes, edges);
-	//lineGraph.bufferGraphData();
+	GfxGraph lineGraph;
+	lineGraph.convertGraphData(nodes, edges);
+	lineGraph.bufferGraphData();
 
 	/* Create a orbital camera */
 	OrbitalCamera camera;
 	camera.longitude = 0.0;
 	camera.latitude = 0.0;
 	camera.orbit = 5.0;
-	camera.near = 0.01;
+	camera.near = 0.0001;
 	camera.far = 10.0;
 	camera.fovy = 30.0 * 3.14/180.0f;
 	camera.aspect_ratio = 16.0/9.0;
@@ -807,6 +979,14 @@ int main(void)
 
 		glPointSize(2.0);
 		db_sphere.draw();
+
+
+		glUseProgram(shader_prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data());
+		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data());
+
+		lineGraph.draw();
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);

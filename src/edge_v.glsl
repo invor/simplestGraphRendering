@@ -2,19 +2,20 @@
 
 #define PI 3.141592653589793238462643383279502884197169399375105820
 
-uniform mat4 view_mx;
-uniform mat4 projection_mx
+uniform mat4 view_matrix;
+uniform mat4 projection_matrix;
 
 in vec2 v_geoCoords;
-in float v_width;
-in int v_color;
+in float v_color;
 
 out float width;
-flat out int color;
+out float color;
 
 void main()
 {
 	// Pass width and color
+	
+	color = v_color;
 
 	float lat_sin = sin( (PI/180.0) * v_geoCoords.y);
 	float lon_sin = sin( (PI/180.0) * v_geoCoords.x);
@@ -28,5 +29,5 @@ void main()
 								lat_sin * r,
 								lat_cos * lon_cos * r );
 								
-	gl_Position = projection_matrix * view_mx * vec4(world_position,1.0);
+	gl_Position = projection_matrix * view_matrix * vec4(world_position,1.0);
 }
