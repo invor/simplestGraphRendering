@@ -962,7 +962,7 @@ int main(int argc, char*argv[])
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
-		 Controls::updateOrbitalCamera(window);
+		Controls::updateOrbitalCamera(window);
 
         /* Render here */
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
