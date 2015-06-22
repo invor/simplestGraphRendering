@@ -1,9 +1,10 @@
 The Simplest Graph Renderer there is
 
 Dependencies:
-    - GLEW
-    - OpenGL
-    - GLFW
+
+    * GLEW
+    * OpenGL
+    * GLFW
 
 To build:
     
