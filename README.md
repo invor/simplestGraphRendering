@@ -6,12 +6,17 @@ Dependencies:
     * OpenGL
     * GLFW
 
+To build super lazy on Linux:
+
+    ./build.sh 
+
+
 To build:
     
     mkdir build
     cd build
     cmake ../
 
-To run:
+To run (in build):
 
-    ./simple -gf ../../fmigraph/saarland.gl
+    ./simple -gf saarland.gl
