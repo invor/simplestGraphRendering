@@ -39,14 +39,14 @@ namespace Mat4
 				a[3]*b[12] + a[7]*b[13] + a[11]*b[14] + a[15]*b[15],
 			}};
 }
-	
+
 	std::array<float, 16> invert(std::array<float,16> a)
 	{
 		float a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
 	    a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
 	    a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
 	    a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
-	
+
 	    b00 = a00 * a11 - a01 * a10,
 	    b01 = a00 * a12 - a02 * a10,
 	    b02 = a00 * a13 - a03 * a10,
@@ -59,16 +59,16 @@ namespace Mat4
 	    b09 = a21 * a32 - a22 * a31,
 	    b10 = a21 * a33 - a23 * a31,
 	    b11 = a22 * a33 - a23 * a32,
-	
+
 	    // Calculate the determinant
 	    det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-	
-	    //if (!det) { 
-	    //    return null; 
+
+	    //if (!det) {
+	    //    return null;
 	    //}
 		// The inverse is used as multiplication factor
 	    det = 1.0 / det;
-	
+
 	    return {{	(a11 * b11 - a12 * b10 + a13 * b09) * det,
 					(a02 * b10 - a01 * b11 - a03 * b09) * det,
 					(a31 * b05 - a32 * b04 + a33 * b03) * det,
@@ -182,13 +182,13 @@ struct OrbitalCamera
 	void updateViewMatrix()
 	{
 		float PI = 3.141592653589793238462643383279502884197169399375105820;
-		
+
 		float lat_sin = sin( (PI/180.0f) * latitude);
 		float lon_sin = sin( (PI/180.0f) * longitude);
-		
+
 		float lat_cos = cos( (PI/180.0f) * latitude);
 		float lon_cos = cos( (PI/180.0f) * longitude);
-		
+
 		float camera_position[3];
 		camera_position[0] = (lon_sin * lat_cos * orbit);
 		camera_position[1] = (lat_sin * orbit);
@@ -262,7 +262,7 @@ struct GfxGraph
 	{
 		// At least as many vertices as there are nodes are required
 		vertices.reserve(nodes.size());
-		
+
 		// Each edge contributes two indices
 		indices.reserve(edges.size()*2);
 
@@ -283,7 +283,7 @@ struct GfxGraph
 		{
 			uint src_id = edge.source;
 			uint tgt_id = edge.target;
-			
+
 			while(has_next[src_id] && (vertices[src_id].color != edge.color))
 			{
 				src_id = next[src_id];
@@ -301,7 +301,7 @@ struct GfxGraph
 				vertices[next_id].color = edge.color;
 				has_next.push_back(false);
 				next.push_back(0);
-			
+
 				next[src_id] = next_id;
 				has_next[src_id] = true;
 				src_id = next_id;
@@ -324,7 +324,7 @@ struct GfxGraph
 				vertices[next_id].color = edge.color;
 				has_next.push_back(false);
 				next.push_back(0);
-			
+
 				next[tgt_id] = next_id;
 				has_next[tgt_id] = true;
 				tgt_id = next_id;
@@ -403,7 +403,7 @@ struct GfxGraph
 		//glBindVertexArray(va_handle);
 		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
 
-		for(int i=0; i< index_offsets.size()-1; i++)
+		for(size_t i=0; i< index_offsets.size()-1; i++)
 		{
 			// TODO account for camera height / zoom level
 			glLineWidth(line_widths[i]);
@@ -430,7 +430,7 @@ struct DebugSphere
 	{
 		std::vector<float> vertices;
 		std::vector<uint> indices;
-		
+
 		float latitude = -90.0;
 		float longitude = -180.0;
 		for(int i=0; i<50; i=i+1)
@@ -438,42 +438,42 @@ struct DebugSphere
 			for(int j=0; j<100; j=j+1)
 			{
 				float PI = 3.141592653589793238462643383279502884197169399375105820;
-		
+
 				float lat_sin = sin( (PI/180.0f) * latitude);
 				float lon_sin = sin( (PI/180.0f) * longitude);
-				
+
 				float lat_cos = cos( (PI/180.0f) * latitude);
 				float lon_cos = cos( (PI/180.0f) * longitude);
-				
+
 				float r = 1.0; //6378137.0;
-				
+
 				vertices.push_back(lon_sin * lat_cos * r);
 				vertices.push_back(lat_sin * r);
 				vertices.push_back(lat_cos * lon_cos * r);
-				
+
 				longitude += (1/100.0) * 360.0;
 			}
 			latitude += (1/50.0) * 180.0;
 		}
-		
+
 		for(int i=0; i<50*100; i=i+1)
 		{
 			indices.push_back((uint)i);
 		}
-		
+
 		if(vertices.size() < 1 || indices.size() < 1)
 			return;
-		
+
 		auto va_size = sizeof(float) * vertices.size();
 		auto vi_size = sizeof(uint) * indices.size();
-		
+
 		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
 		{
 			glGenVertexArrays(1, &va_handle);
 			glGenBuffers(1, &vbo_handle);
 			glGenBuffers(1, &ibo_handle);
 		}
-		
+
 		glBindVertexArray(va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
 		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
@@ -574,7 +574,7 @@ GLuint createShaderProgram()
 
 	/* Set the location (i.e. index) of the attribute (basically the input variable) in the vertex shader.
 	 * The vertices intended to be used with this program will have to match that index in their
-	 * attribute decription, so that a connection between the vertex data and the shader input can be made. 
+	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
 	 */
 	glBindAttribLocation(handle, 0, "v_geoCoords");
 	glBindAttribLocation(handle, 1, "v_color");
@@ -595,7 +595,7 @@ GLuint createShaderProgram()
 
 	/* Load, compile and attach fragment shader */
 	std::string fs_source = readShaderFile( "../src/edge_f.glsl");
-	
+
 	GLuint fragment_shader = compileShader(&fs_source,GL_FRAGMENT_SHADER);
 
 	/* Attach shader to program */
@@ -605,7 +605,7 @@ GLuint createShaderProgram()
 	 * It will only be actually deleted after the program is deleted. (See destructor for program deletion.
 	 */
 	glDeleteShader(fragment_shader);
-	
+
 
 	/* Link program */
 	glLinkProgram(handle);
@@ -646,7 +646,7 @@ GLuint createDebugShaderProgram()
 
 	/* Set the location (i.e. index) of the attribute (basically the input variable) in the vertex shader.
 	 * The vertices intended to be used with this program will have to match that index in their
-	 * attribute decription, so that a connection between the vertex data and the shader input can be made. 
+	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
 	 */
 	glBindAttribLocation(handle, 0, "v_position");
 
@@ -716,30 +716,30 @@ namespace Controls {
 		OrbitalCamera* active_camera = reinterpret_cast<OrbitalCamera*>(glfwGetWindowUserPointer(window));
 
 		float camera_height_inertia = std::pow( (active_camera->orbit - 1.0f )*0.1f, 1.0);
-		
+
 		active_camera->moveInOrbit(0.0,0.0,-camera_height_inertia * (float)y_offset);
 	}
-	
+
 	void updateOrbitalCamera(GLFWwindow *window)
 	{
 		OrbitalCamera* active_camera = reinterpret_cast<OrbitalCamera*>(glfwGetWindowUserPointer(window));
-	
+
 		/*	Get current cursor position on the screen */
 		double pos_x, pos_y;
 		glfwGetCursorPos(window, &pos_x, &pos_y);
-		std::array<float,2> currentCursorPosition = {{pos_x, pos_y}};
+		std::array<float,2> currentCursorPosition = {{(float) pos_x, (float) pos_y}};
 		std::array<float,2> cursor_movement = {{latest_cursor_position[0] - currentCursorPosition[0],latest_cursor_position[1] - currentCursorPosition[1]}};
-	
+
 		if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2) == GLFW_PRESS)
 		{
 			//camera_lon += cursor_movement.x;
 			//camera_lat -= cursor_movement.y;
-	
+
 			GLfloat camera_vertical_inertia = std::pow( (active_camera->orbit - 1.0)*0.1, 1.2f);
-	
+
 			active_camera->moveInOrbit(-cursor_movement[1]*camera_vertical_inertia,cursor_movement[0]*camera_vertical_inertia,0.0);
 		}
-	
+
 		latest_cursor_position = currentCursorPosition;
 	}
 
@@ -844,6 +844,9 @@ int main(int argc, char*argv[])
 	std::string filepath;
 
 	int i=0;
+        if (argc == 1) {
+          std::cout<<"Supply a graph with -gf <graph.gl>"<<std::endl; return 0;
+        }
 	while(i<argc)
 	{
 		if(argv[i] == (std::string) "-gf")
@@ -973,7 +976,7 @@ int main(int argc, char*argv[])
 		glViewport(0, 0, width, height);
 
 		glUseProgram(debug_prgm_handle);
-		
+
 		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data());
 		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data());
 
