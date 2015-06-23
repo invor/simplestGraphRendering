@@ -11,3 +11,7 @@ To build:
     mkdir build
     cd build
     cmake ../
+
+To run:
+
+    ./simple -gf ../../fmigraph/saarland.gl
