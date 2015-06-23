@@ -2,8 +2,6 @@
 
 in float color;
 
-out vec4 gl_FragColor;
-
 void main()
 {
 	vec3 out_color = vec3(0.0);
