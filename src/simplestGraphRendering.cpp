@@ -873,6 +873,11 @@ int main(int argc, char*argv[])
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
+    //http://www.glfw.org/faq.html#how-do-i-create-an-opengl-30-context
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     window = glfwCreateWindow(1600, 900, "Simple Graph Renderer", NULL, NULL);
     if (!window)
     {
@@ -884,7 +889,7 @@ int main(int argc, char*argv[])
     glfwMakeContextCurrent(window);
 
 	/*	Initialize glew */
-	//glewExperimental = GL_TRUE;
+	glewExperimental = GL_TRUE; // core contexts aren't properly supported by glew yet
 	GLenum error = glewInit();
 	if( GLEW_OK != error)
 	{
