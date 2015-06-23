@@ -844,6 +844,9 @@ int main(int argc, char*argv[])
 	std::string filepath;
 
 	int i=0;
+        if (argc == 1) {
+          std::cout<<"Supply a graph with -gf <graph.gl>"<<std::endl; return 0;
+        }
 	while(i<argc)
 	{
 		if(argv[i] == (std::string) "-gf")
