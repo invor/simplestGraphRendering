@@ -2,6 +2,8 @@
 
 in float color;
 
+out vec4 fragColor;
+
 void main()
 {
 	vec3 out_color = vec3(0.0);
@@ -19,5 +21,5 @@ void main()
 	else if(color < 5.5)
 		out_color = vec3(1.0,1.0,1.0);
 		
-	gl_FragColor = vec4(out_color,1.0);
+	fragColor = vec4(out_color,1.0);
 }
