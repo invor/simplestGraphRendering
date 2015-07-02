@@ -346,6 +346,7 @@ struct GfxGraph
 
 			counter += 2;
 		}
+		index_offsets.push_back(indices.size());
 
 		std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
 	}
@@ -873,6 +874,10 @@ int main(int argc, char*argv[])
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
+	//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+	//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     window = glfwCreateWindow(1600, 900, "Simple Graph Renderer", NULL, NULL);
     if (!window)
     {
