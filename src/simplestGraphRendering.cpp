@@ -399,15 +399,16 @@ struct GfxGraph
 	/**
 	 * Draw the graph mesh
 	 */
-	void draw()
+	void draw(float scale)
 	{
 		//glBindVertexArray(va_handle);
 		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
 
 		for(size_t i=0; i< index_offsets.size()-1; i++)
 		{
-			// TODO account for camera height / zoom level
-			glLineWidth(line_widths[i]);
+			glLineWidth(line_widths[i] * scale);
+			//glLineWidth(line_widths[i]);
+
 			glBindVertexArray(va_handle);
 			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
 		}
@@ -994,7 +995,9 @@ int main(int argc, char*argv[])
 		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data());
 		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data());
 
-		lineGraph.draw();
+		float scale = std::min((0.0025/(camera.orbit - 1.0f)),2.0);
+
+		lineGraph.draw( scale );
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
