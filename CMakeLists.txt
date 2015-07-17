@@ -12,7 +12,7 @@
 
 # OBJECT library requires 2.8.8
 cmake_minimum_required(VERSION 2.8.8 FATAL_ERROR)
-project(simplestGraphRendering CXX)
+project(simplestGraphRendering CXX C)
 
 find_package(PkgConfig REQUIRED)
 pkg_search_module(GLFW REQUIRED glfw3)
