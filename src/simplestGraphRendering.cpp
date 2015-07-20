@@ -129,6 +129,9 @@ struct Vertex
 	float color;
 };
 
+/*
+ * Camera (for OpenGL) orbiting a sphere that is centered on the origin
+ */
 struct OrbitalCamera
 {
 	OrbitalCamera() {}
@@ -406,7 +409,7 @@ struct GfxGraph
 
 		for(size_t i=0; i< index_offsets.size()-1; i++)
 		{
-			glLineWidth(line_widths[i] * scale);
+			glLineWidth(std::max(1.0f,line_widths[i] * scale));
 			//glLineWidth(line_widths[i]);
 
 			glBindVertexArray(va_handle);
@@ -845,16 +848,16 @@ int main(int argc, char*argv[])
 
 	std::string filepath;
 
-	int i=0;
-        if (argc == 1) {
-          std::cout<<"Supply a graph with -gf <graph.gl>"<<std::endl; return 0;
-        }
+	int i=1;
+    if (argc < 3) {
+		std::cout<<"Supply a graph with -gf <graph.gl>"<<std::endl; return 0;
+	}
 	while(i<argc)
 	{
 		if(argv[i] == (std::string) "-gf")
 		{
 			i++;
-			if(i<argc) { filepath = argv[i]; }
+			if(i<argc) { filepath = argv[i]; i++; }
 			else { std::cout<<"Missing parameter for -gf"<<std::endl; return 0; }
 		}
 		else
