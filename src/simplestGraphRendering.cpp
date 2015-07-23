@@ -11,41 +11,53 @@
 
 typedef unsigned int uint;
 
-typedef std::array<float,16> Mat4x4;
-
-namespace Mat4
+struct Mat4x4
 {
-	std::array<float,16> multiply(std::array<float,16> a, std::array<float,16> b)
-{
-	return {{	// first row
-				a[0]*b[0] + a[4]*b[1] + a[8]*b[2] + a[12]*b[3],
-				a[1]*b[0] + a[5]*b[1] + a[9]*b[2] + a[13]*b[3],
-				a[2]*b[0] + a[6]*b[1] + a[10]*b[2] + a[14]*b[3],
-				a[3]*b[0] + a[7]*b[1] + a[11]*b[2] + a[15]*b[3],
-				// second row
-				a[0]*b[4] + a[4]*b[5] + a[8]*b[6] + a[12]*b[7],
-				a[1]*b[4] + a[5]*b[5] + a[9]*b[6] + a[13]*b[7],
-				a[2]*b[4] + a[6]*b[5] + a[10]*b[6] + a[14]*b[7],
-				a[3]*b[4] + a[7]*b[5] + a[11]*b[6] + a[15]*b[7],
-				// third row
-				a[0]*b[8] + a[4]*b[9] + a[8]*b[10] + a[12]*b[11],
-				a[1]*b[8] + a[5]*b[9] + a[9]*b[10] + a[13]*b[11],
-				a[2]*b[8] + a[6]*b[9] + a[10]*b[10] + a[14]*b[11],
-				a[3]*b[8] + a[7]*b[9] + a[11]*b[10] + a[15]*b[11],
-				// fourth row
-				a[0]*b[12] + a[4]*b[13] + a[8]*b[14] + a[12]*b[15],
-				a[1]*b[12] + a[5]*b[13] + a[9]*b[14] + a[13]*b[15],
-				a[2]*b[12] + a[6]*b[13] + a[10]*b[14] + a[14]*b[15],
-				a[3]*b[12] + a[7]*b[13] + a[11]*b[14] + a[15]*b[15],
-			}};
-}
+	Mat4x4() : data() {}
+	Mat4x4(const std::array<float,16> data) : data(data) {}
 
-	std::array<float, 16> invert(std::array<float,16> a)
+	std::array<float,16> data;
+
+	float& operator[] (int index)
 	{
-		float a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-	    a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-	    a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-	    a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+		return data[index];
+	}
+
+	Mat4x4 operator* (const Mat4x4& m)
+	{
+		Mat4x4 b(m);
+
+		return Mat4x4(
+			{{	// first row
+				data[0]*b[0] + data[4]*b[1] + data[8]*b[2] + data[12]*b[3],
+				data[1]*b[0] + data[5]*b[1] + data[9]*b[2] + data[13]*b[3],
+				data[2]*b[0] + data[6]*b[1] + data[10]*b[2] + data[14]*b[3],
+				data[3]*b[0] + data[7]*b[1] + data[11]*b[2] + data[15]*b[3],
+				// second row
+				data[0]*b[4] + data[4]*b[5] + data[8]*b[6] + data[12]*b[7],
+				data[1]*b[4] + data[5]*b[5] + data[9]*b[6] + data[13]*b[7],
+				data[2]*b[4] + data[6]*b[5] + data[10]*b[6] + data[14]*b[7],
+				data[3]*b[4] + data[7]*b[5] + data[11]*b[6] + data[15]*b[7],
+				// third row
+				data[0]*b[8] + data[4]*b[9] + data[8]*b[10] + data[12]*b[11],
+				data[1]*b[8] + data[5]*b[9] + data[9]*b[10] + data[13]*b[11],
+				data[2]*b[8] + data[6]*b[9] + data[10]*b[10] + data[14]*b[11],
+				data[3]*b[8] + data[7]*b[9] + data[11]*b[10] + data[15]*b[11],
+				// fourth row
+				data[0]*b[12] + data[4]*b[13] + data[8]*b[14] + data[12]*b[15],
+				data[1]*b[12] + data[5]*b[13] + data[9]*b[14] + data[13]*b[15],
+				data[2]*b[12] + data[6]*b[13] + data[10]*b[14] + data[14]*b[15],
+				data[3]*b[12] + data[7]*b[13] + data[11]*b[14] + data[15]*b[15],
+			}}
+		);
+	}
+
+	Mat4x4 inverse()
+	{
+		float a00 = data[0], a01 = data[1], a02 = data[2], a03 = data[3],
+	    a10 = data[4], a11 = data[5], a12 = data[6], a13 = data[7],
+	    a20 = data[8], a21 = data[9], a22 = data[10], a23 = data[11],
+	    a30 = data[12], a31 = data[13], a32 = data[14], a33 = data[15],
 
 	    b00 = a00 * a11 - a01 * a10,
 	    b01 = a00 * a12 - a02 * a10,
@@ -69,7 +81,7 @@ namespace Mat4
 		// The inverse is used as multiplication factor
 	    det = 1.0 / det;
 
-	    return {{	(a11 * b11 - a12 * b10 + a13 * b09) * det,
+	    return Mat4x4({{	(a11 * b11 - a12 * b10 + a13 * b09) * det,
 					(a02 * b10 - a01 * b11 - a03 * b09) * det,
 					(a31 * b05 - a32 * b04 + a33 * b03) * det,
 					(a22 * b04 - a21 * b05 - a23 * b03) * det,
@@ -84,9 +96,9 @@ namespace Mat4
 					(a11 * b07 - a10 * b09 - a12 * b06) * det,
 					(a00 * b09 - a01 * b07 + a02 * b06) * det,
 					(a31 * b01 - a30 * b03 - a32 * b00) * det,
-					(a20 * b03 - a21 * b01 + a22 * b00) * det	}};
+					(a20 * b03 - a21 * b01 + a22 * b00) * det	}});
 	}
-}
+};
 
 /**
  * Node struct for parsing preprocessed osm graph from file
@@ -157,8 +169,8 @@ struct OrbitalCamera
 		updateViewMatrix();
 	}
 
-	std::array<float,16> view_matrix;
-	std::array<float,16> projection_matrix;
+	Mat4x4 view_matrix;
+	Mat4x4 projection_matrix;
 
 	void updateProjectionMatrix()
 	{
@@ -197,31 +209,31 @@ struct OrbitalCamera
 		camera_position[1] = (lat_sin * orbit);
 		camera_position[2] = (lat_cos * lon_cos * orbit);
 
-		Mat4x4 lat_rotation = {{1.0, 0.0, 0.0, 0.0,
+		Mat4x4 lat_rotation({{1.0, 0.0, 0.0, 0.0,
 								0.0, lat_cos, -lat_sin, 0.0,
 								0.0, lat_sin, lat_cos, 0.0,
-								0.0, 0.0, 0.0, 1.0}};
+								0.0, 0.0, 0.0, 1.0}});
 
-		Mat4x4 lon_rotation = {{lon_cos, 0.0, -lon_sin, 0.0,
+		Mat4x4 lon_rotation({{lon_cos, 0.0, -lon_sin, 0.0,
 								0.0, 1.0, 0.0, 0.0,
 								lon_sin, 0.0, lon_cos, 0.0,
-								0.0, 0.0, 0.0 , 1.0}};
+								0.0, 0.0, 0.0 , 1.0}});
 
-		Mat4x4 rotation_matrix = Mat4::multiply(lon_rotation,lat_rotation);
+		Mat4x4 rotation_matrix = lon_rotation * lat_rotation;
 
-		rotation_matrix = Mat4::invert(rotation_matrix);
+		rotation_matrix = rotation_matrix.inverse();
 
-		Mat4x4 translation_matrix = {{1.0, 0.0, 0.0, 0.0,
+		Mat4x4 translation_matrix({{1.0, 0.0, 0.0, 0.0,
 										0.0, 1.0, 0.0, 0.0,
 										0.0, 0.0, 1.0, 0.0,
-										-camera_position[0], -camera_position[1], -camera_position[2], 1.0}};
+										-camera_position[0], -camera_position[1], -camera_position[2], 1.0}});
 
-		view_matrix = Mat4::multiply(rotation_matrix,translation_matrix);
+		view_matrix = rotation_matrix * translation_matrix;
 	}
 };
 
 /**
- * This struct essentially holds a renderable representation of the graph as a mesh, which is made up from
+ * This struct essentially holds a renderable representation of a subgraph as a mesh, which is made up from
  * a set of vertices and a set of indices (the latter describing the mesh connectivity).
  * In this case the mesh uses line primitives, i.e. two succesive indices describe a single line segment.
  *
@@ -229,14 +241,9 @@ struct OrbitalCamera
  * organised together in a struct as most high level operations like "send the mesh data to the GPU" require
  * several OpenGL function calls and all of these handles.
  */
-struct GfxGraph
+struct Subgraph
 {
-	GfxGraph() : vertices(), indices(), va_handle(0), vbo_handle(0), ibo_handle(0), index_offsets(), line_widths() {}
-
-	/* CPU-side storage for vertex data */
-	std::vector<Vertex> vertices;
-	/* CPU-side storage for index data */
-	std::vector<uint> indices;
+	Subgraph() : va_handle(0), vbo_handle(0), ibo_handle(0), index_offsets(), line_widths() {}
 
 	/* Handle for the vertex array object */
 	GLuint va_handle;
@@ -256,13 +263,142 @@ struct GfxGraph
 	std::vector<float> line_widths;
 
 	/**
+	 * Allocate GPU memory and send data
+	 */
+	void bufferGraphData(std::vector<Vertex>& vertices, std::vector<uint>& indices)
+	{
+		if(vertices.size() < 1 || indices.size() < 1)
+			return;
+
+		auto va_size = sizeof(Vertex) * vertices.size();
+		auto vi_size = sizeof(uint) * indices.size();
+
+		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &va_handle);
+			glGenBuffers(1, &vbo_handle);
+			glGenBuffers(1, &ibo_handle);
+		}
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 1, GL_FLOAT, false, sizeof(Vertex), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	void draw(float scale)
+	{
+		//glBindVertexArray(va_handle);
+		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
+
+		for(size_t i=0; i< index_offsets.size()-1; i++)
+		{
+			glLineWidth(std::max(1.0f,line_widths[i] * scale));
+			//glLineWidth(line_widths[i]);
+
+			glBindVertexArray(va_handle);
+			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
+		}
+	}
+};
+
+/**
+ * A graph made up from subgraphs. Limited to rendering edges.
+ * This struct primarily holds a set of subgraphs and offers the neccessary functionality to add and change subgraphs.
+ */
+struct GfxGraph
+{
+	GfxGraph() : vertices(), indices() {}
+
+	/* CPU-side storage for vertex data. Used when converting graph data. */
+	std::vector<Vertex> vertices;
+	/* CPU-side storage for index data. Used when converting graph data. */
+	std::vector<uint> indices;
+
+	/* Visibility information for each subgraph */
+	std::vector<bool> isVisible;
+
+	/* The subgraphs that make up the graph itself */
+	std::vector<Subgraph> subgraphs;
+
+	/**
+	 * Add a new subgraph to the graph
+	 */
+	void addSubgraph(std::vector<Node>& nodes, std::vector<Edge>& edges)
+	{
+		uint new_subgraph_index = subgraphs.size();
+
+		isVisible.push_back(true);
+		subgraphs.push_back(Subgraph());
+
+		convertGraphData(new_subgraph_index,nodes,edges);
+
+		subgraphs[new_subgraph_index].bufferGraphData(vertices,indices);
+	}
+
+	/**
+	 * Update a specific subgraph with new data
+	 */
+	void reloadSubgraph(uint index, std::vector<Node>& nodes, std::vector<Edge>& edges)
+	{
+		if( index >= subgraphs.size() )
+			return;
+
+		subgraphs[index].index_offsets.clear();
+		subgraphs[index].line_widths.clear();
+
+		convertGraphData(index,nodes,edges);
+
+		subgraphs[index].bufferGraphData(vertices,indices);
+	}
+
+	/**
+	 * Set visibility for a specific subgraph
+	 */
+	void setVisibility(uint index, bool visibility)
+	{
+		if( index < isVisible.size() )
+			isVisible[index] = visibility;
+	}
+
+	/**
+	 * Draw all subgraphs set to visible
+	 */
+	void draw(float scale)
+	{
+		for(int i=0; i<subgraphs.size(); i++)
+		{
+			if(isVisible[i])
+				subgraphs[i].draw(scale);
+		}
+	}
+
+	private:
+
+	/**
 	* Converts a graph from the input format into the format that is send to the GPU for rendering, i.e. a mesh build from vertex and index data.
 	* A purely CPU based preprocessing function that converts the data.
 	* Note: If the updated graph sections are not in the same format that is used for rendering, this function has to be called each time the graph
 	* or a section of the graph is updated, before the updated graph data can be send to the GPU for rendering!
 	*/
-	void convertGraphData(std::vector<Node>& nodes, std::vector<Edge>& edges)
+	void convertGraphData(uint subgraph_index, std::vector<Node>& nodes, std::vector<Edge>& edges)
 	{
+		vertices.clear();
+		indices.clear();
+
 		// At least as many vertices as there are nodes are required
 		vertices.reserve(nodes.size());
 
@@ -339,8 +475,8 @@ struct GfxGraph
 
 			if(width != edge.width)
 			{
-				index_offsets.push_back(counter);
-				line_widths.push_back((float)edge.width);
+				subgraphs[subgraph_index].index_offsets.push_back(counter);
+				subgraphs[subgraph_index].line_widths.push_back((float)edge.width);
 				width = edge.width;
 			}
 
@@ -349,73 +485,11 @@ struct GfxGraph
 
 			counter += 2;
 		}
-		index_offsets.push_back(indices.size());
+		subgraphs[subgraph_index].index_offsets.push_back(indices.size());
 
 		std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
 	}
 
-	/**
-	 * Allocate GPU memory and send data
-	 */
-	void bufferGraphData()
-	{
-		if(vertices.size() < 1 || indices.size() < 1)
-			return;
-
-		auto va_size = sizeof(Vertex) * vertices.size();
-		auto vi_size = sizeof(uint) * indices.size();
-
-		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
-		{
-			glGenVertexArrays(1, &va_handle);
-			glGenBuffers(1, &vbo_handle);
-			glGenBuffers(1, &ibo_handle);
-		}
-
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER,0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), 0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 1, GL_FLOAT, false, sizeof(Vertex), (GLvoid*) (sizeof(GL_FLOAT)*2));
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-	}
-
-	/**
-	 * TODO
-	 * Send new data to GPU memory without reallocation (should be faster)
-	 */
-	void rebufferGraphData()
-	{
-	}
-
-	/**
-	 * Draw the graph mesh
-	 */
-	void draw(float scale)
-	{
-		//glBindVertexArray(va_handle);
-		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
-
-		for(size_t i=0; i< index_offsets.size()-1; i++)
-		{
-			glLineWidth(std::max(1.0f,line_widths[i] * scale));
-			//glLineWidth(line_widths[i]);
-
-			glBindVertexArray(va_handle);
-			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
-		}
-	}
 };
 
 struct DebugSphere
@@ -568,10 +642,13 @@ GLuint compileShader(const std::string * const source, GLenum shaderType)
 }
 
 /**
- * Load the shader program for rendering edges
- * This function looks confusing, even to me...
+ * Load a shader program
+ * \attribute vs_path Path to vertex shader source file
+ * \attribute fs_path Path to fragement shader source file
+ * \attribute attributes Vertex shader input attributes (i.e. vertex layout)
+ * \return Returns the handle of the created GLSL program
  */
-GLuint createShaderProgram()
+GLuint createShaderProgram(const char* const vs_path, const char* const fs_path, std::vector<const char* const> attributes)
 {
 	/* Create a shader program object */
 	GLuint handle;
@@ -581,11 +658,11 @@ GLuint createShaderProgram()
 	 * The vertices intended to be used with this program will have to match that index in their
 	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
 	 */
-	glBindAttribLocation(handle, 0, "v_geoCoords");
-	glBindAttribLocation(handle, 1, "v_color");
+	for(int i=0; i<attributes.size(); i++)
+		glBindAttribLocation(handle, i, attributes[i]);
 
 	/* Read the shader source files */
-	std::string vs_source = readShaderFile( "../src/edge_v.glsl");
+	std::string vs_source = readShaderFile(vs_path);
 
 	GLuint vertex_shader = compileShader(&vs_source, GL_VERTEX_SHADER);
 
@@ -599,7 +676,7 @@ GLuint createShaderProgram()
 
 
 	/* Load, compile and attach fragment shader */
-	std::string fs_source = readShaderFile( "../src/edge_f.glsl");
+	std::string fs_source = readShaderFile(fs_path);
 
 	GLuint fragment_shader = compileShader(&fs_source,GL_FRAGMENT_SHADER);
 
@@ -638,66 +715,7 @@ GLuint createShaderProgram()
 		return -1;
 
 	return handle;
-}
 
-/**
- * Load a shader for debugging pruposes
- */
-GLuint createDebugShaderProgram()
-{
-	/* Create a shader program object */
-	GLuint handle;
-	handle = glCreateProgram();
-
-	/* Set the location (i.e. index) of the attribute (basically the input variable) in the vertex shader.
-	 * The vertices intended to be used with this program will have to match that index in their
-	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
-	 */
-	glBindAttribLocation(handle, 0, "v_position");
-
-	/* Read the shader source files */
-	std::string vs_source = readShaderFile( "../src/debug_v.glsl");
-	std::string fs_source = readShaderFile( "../src/debug_f.glsl");
-
-	GLuint vertex_shader = compileShader(&vs_source, GL_VERTEX_SHADER);
-	GLuint fragment_shader = compileShader(&fs_source,GL_FRAGMENT_SHADER);
-
-	/* Attach shader to program */
-	glAttachShader(handle, vertex_shader);
-	glAttachShader(handle, fragment_shader);
-
-	/* Flag shader program for deletion.
-	 * It will only be actually deleted after the program is deleted. (See destructor for program deletion.
-	 */
-	glDeleteShader(vertex_shader);
-	glDeleteShader(fragment_shader);
-
-	/* Link program */
-	glLinkProgram(handle);
-
-	/* Check if linking was successful */
-	std::string shader_log;
-	GLint status = GL_FALSE;
-	glGetProgramiv(handle, GL_LINK_STATUS, &status);
-
-	GLint logLen = 0;
-	shader_log = "";
-	glGetProgramiv(handle, GL_INFO_LOG_LENGTH, &logLen);
-	if(logLen > 0)
-	{
-		char *log = new char[logLen];
-		GLsizei written;
-		glGetProgramInfoLog(handle, logLen, &written, log);
-		shader_log = log;
-		delete [] log;
-
-		std::cout<<shader_log;
-	}
-
-	if(status == GL_FALSE)
-		return -1;
-
-	return handle;
 }
 
 
@@ -935,16 +953,15 @@ int main(int argc, char*argv[])
 	 */
 
 	/* Create GLSL program */
-	GLuint shader_prgm_handle = createShaderProgram();
-	GLuint debug_prgm_handle = createDebugShaderProgram();
+	GLuint shader_prgm_handle = createShaderProgram("../src/edge_v.glsl","../src/edge_f.glsl",{"v_geoCoords","v_color"});
+	GLuint debug_prgm_handle = createShaderProgram("../src/debug_v.glsl","../src/debug_f.glsl",{"v_position"});
 
 	//GLenum glerror = glGetError();
 	//std::cout<<glerror<<std::endl;
 
 	/* Create renderable graph (mesh) */
 	GfxGraph lineGraph;
-	lineGraph.convertGraphData(nodes, edges);
-	lineGraph.bufferGraphData();
+	lineGraph.addSubgraph(nodes,edges);
 
 	/* Create a orbital camera */
 	OrbitalCamera camera;
@@ -986,8 +1003,8 @@ int main(int argc, char*argv[])
 
 		glUseProgram(debug_prgm_handle);
 
-		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data());
-		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data());
+		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
 
 		glPointSize(2.0);
 		db_sphere.draw();
@@ -995,8 +1012,8 @@ int main(int argc, char*argv[])
 
 		glUseProgram(shader_prgm_handle);
 
-		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data());
-		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data());
+		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
 
 		float scale = std::min((0.0025/(camera.orbit - 1.0f)),2.0);
 
