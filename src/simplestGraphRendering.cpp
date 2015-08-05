@@ -8,6 +8,7 @@
 #include <string>
 #include <algorithm>
 #include <iostream>
+#include <memory>
 
 typedef unsigned int uint;
 
@@ -79,7 +80,7 @@ struct Mat4x4
 	    //    return null;
 	    //}
 		// The inverse is used as multiplication factor
-	    det = 1.0 / det;
+	    det = 1.0f / det;
 
 	    return Mat4x4({{	(a11 * b11 - a12 * b10 + a13 * b09) * det,
 					(a02 * b10 - a01 * b11 - a03 * b09) * det,
@@ -118,7 +119,7 @@ struct Node
  */
 struct Edge
 {
-	Edge() : source(0), target(0), width(0.0), color(0) {}
+	Edge() : source(0), target(0), width(0), color(0) {}
 	Edge(uint s, uint t, uint w, uint c) :
 	source(s), target(t), width(w), color(c) {}
 
@@ -134,6 +135,7 @@ struct Edge
  */
 struct Vertex
 {
+	Vertex() : longitude(0.0), latitude(0.0), color(-1) {}
 	Vertex(float lon, float lat) : longitude(lon), latitude(lat), color(-1) {}
 
 	float longitude;
@@ -141,441 +143,6 @@ struct Vertex
 	float color;
 };
 
-/*
- * Camera (for OpenGL) orbiting a sphere that is centered on the origin
- */
-struct OrbitalCamera
-{
-	OrbitalCamera() {}
-	~OrbitalCamera() {}
-
-	float longitude;
-	float latitude;
-	float orbit;
-
-	float near;
-	float far;
-	float fovy;
-	float aspect_ratio;
-
-	void moveInOrbit(float delta_lat, float delta_lon, float delta_height)
-	{
-		latitude += delta_lat;
-		longitude += delta_lon;
-		//m_orbit += delta_height;
-
-		orbit =  std::max(1.0f+0.000025f,orbit + delta_height);
-
-		updateViewMatrix();
-	}
-
-	Mat4x4 view_matrix;
-	Mat4x4 projection_matrix;
-
-	void updateProjectionMatrix()
-	{
-		float f = 1.0f / std::tan(fovy / 2.0f);
-        float nf = 1.0f / (near - far);
-		projection_matrix[0] = f / aspect_ratio;
-		projection_matrix[1] = 0;
-		projection_matrix[2] = 0;
-		projection_matrix[3] = 0;
-		projection_matrix[4] = 0;
-		projection_matrix[5] = f;
-		projection_matrix[6] = 0;
-		projection_matrix[7] = 0;
-		projection_matrix[8] = 0;
-		projection_matrix[9] = 0;
-		projection_matrix[10] = (far + near) * nf;
-		projection_matrix[11] = -1;
-		projection_matrix[12] = 0;
-		projection_matrix[13] = 0;
-		projection_matrix[14] = (2 * far * near) * nf;
-		projection_matrix[15] = 0;
-	}
-
-	void updateViewMatrix()
-	{
-		float PI = 3.141592653589793238462643383279502884197169399375105820;
-
-		float lat_sin = sin( (PI/180.0f) * latitude);
-		float lon_sin = sin( (PI/180.0f) * longitude);
-
-		float lat_cos = cos( (PI/180.0f) * latitude);
-		float lon_cos = cos( (PI/180.0f) * longitude);
-
-		float camera_position[3];
-		camera_position[0] = (lon_sin * lat_cos * orbit);
-		camera_position[1] = (lat_sin * orbit);
-		camera_position[2] = (lat_cos * lon_cos * orbit);
-
-		Mat4x4 lat_rotation({{1.0, 0.0, 0.0, 0.0,
-								0.0, lat_cos, -lat_sin, 0.0,
-								0.0, lat_sin, lat_cos, 0.0,
-								0.0, 0.0, 0.0, 1.0}});
-
-		Mat4x4 lon_rotation({{lon_cos, 0.0, -lon_sin, 0.0,
-								0.0, 1.0, 0.0, 0.0,
-								lon_sin, 0.0, lon_cos, 0.0,
-								0.0, 0.0, 0.0 , 1.0}});
-
-		Mat4x4 rotation_matrix = lon_rotation * lat_rotation;
-
-		rotation_matrix = rotation_matrix.inverse();
-
-		Mat4x4 translation_matrix({{1.0, 0.0, 0.0, 0.0,
-										0.0, 1.0, 0.0, 0.0,
-										0.0, 0.0, 1.0, 0.0,
-										-camera_position[0], -camera_position[1], -camera_position[2], 1.0}});
-
-		view_matrix = rotation_matrix * translation_matrix;
-	}
-};
-
-/**
- * This struct essentially holds a renderable representation of a subgraph as a mesh, which is made up from
- * a set of vertices and a set of indices (the latter describing the mesh connectivity).
- * In this case the mesh uses line primitives, i.e. two succesive indices describe a single line segment.
- *
- * From a programming point of view, it makes sense to keep the three OpenGL handles required for a mesh obejct
- * organised together in a struct as most high level operations like "send the mesh data to the GPU" require
- * several OpenGL function calls and all of these handles.
- */
-struct Subgraph
-{
-	Subgraph() : va_handle(0), vbo_handle(0), ibo_handle(0), index_offsets(), line_widths() {}
-
-	/* Handle for the vertex array object */
-	GLuint va_handle;
-
-	/* Handle for the vertex buffer object (allows access to vertex data in GPU memory) */
-	GLuint vbo_handle;
-
-	/* Handle for the index buffer objects (allows access to index data in GPU memory) */
-	GLuint ibo_handle;
-
-	/* To draw lines of different type, i.e of different width seperatly but still store them
-	 * in the same index buffer object, offsets into the buffer are used to only draw a subset of the index buffer
-	 * in each draw call.
-	 */
-	std::vector<uint> index_offsets;
-	/* Stores the width of each subset of lines */
-	std::vector<float> line_widths;
-
-	/**
-	 * Allocate GPU memory and send data
-	 */
-	void bufferGraphData(std::vector<Vertex>& vertices, std::vector<uint>& indices)
-	{
-		if(vertices.size() < 1 || indices.size() < 1)
-			return;
-
-		auto va_size = sizeof(Vertex) * vertices.size();
-		auto vi_size = sizeof(uint) * indices.size();
-
-		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
-		{
-			glGenVertexArrays(1, &va_handle);
-			glGenBuffers(1, &vbo_handle);
-			glGenBuffers(1, &ibo_handle);
-		}
-
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER,0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), 0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 1, GL_FLOAT, false, sizeof(Vertex), (GLvoid*) (sizeof(GL_FLOAT)*2));
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-	}
-
-	void draw(float scale)
-	{
-		//glBindVertexArray(va_handle);
-		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
-
-		for(size_t i=0; i< index_offsets.size()-1; i++)
-		{
-			glLineWidth(std::max(1.0f,line_widths[i] * scale));
-			//glLineWidth(line_widths[i]);
-
-			glBindVertexArray(va_handle);
-			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
-		}
-	}
-};
-
-/**
- * A graph made up from subgraphs. Limited to rendering edges.
- * This struct primarily holds a set of subgraphs and offers the neccessary functionality to add and change subgraphs.
- */
-struct GfxGraph
-{
-	GfxGraph() : vertices(), indices() {}
-
-	/* CPU-side storage for vertex data. Used when converting graph data. */
-	std::vector<Vertex> vertices;
-	/* CPU-side storage for index data. Used when converting graph data. */
-	std::vector<uint> indices;
-
-	/* Visibility information for each subgraph */
-	std::vector<bool> isVisible;
-
-	/* The subgraphs that make up the graph itself */
-	std::vector<Subgraph> subgraphs;
-
-	/**
-	 * Add a new subgraph to the graph
-	 */
-	void addSubgraph(std::vector<Node>& nodes, std::vector<Edge>& edges)
-	{
-		uint new_subgraph_index = subgraphs.size();
-
-		isVisible.push_back(true);
-		subgraphs.push_back(Subgraph());
-
-		convertGraphData(new_subgraph_index,nodes,edges);
-
-		subgraphs[new_subgraph_index].bufferGraphData(vertices,indices);
-	}
-
-	/**
-	 * Update a specific subgraph with new data
-	 */
-	void reloadSubgraph(uint index, std::vector<Node>& nodes, std::vector<Edge>& edges)
-	{
-		if( index >= subgraphs.size() )
-			return;
-
-		subgraphs[index].index_offsets.clear();
-		subgraphs[index].line_widths.clear();
-
-		convertGraphData(index,nodes,edges);
-
-		subgraphs[index].bufferGraphData(vertices,indices);
-	}
-
-	/**
-	 * Set visibility for a specific subgraph
-	 */
-	void setVisibility(uint index, bool visibility)
-	{
-		if( index < isVisible.size() )
-			isVisible[index] = visibility;
-	}
-
-	/**
-	 * Draw all subgraphs set to visible
-	 */
-	void draw(float scale)
-	{
-		for(int i=0; i<subgraphs.size(); i++)
-		{
-			if(isVisible[i])
-				subgraphs[i].draw(scale);
-		}
-	}
-
-	private:
-
-	/**
-	* Converts a graph from the input format into the format that is send to the GPU for rendering, i.e. a mesh build from vertex and index data.
-	* A purely CPU based preprocessing function that converts the data.
-	* Note: If the updated graph sections are not in the same format that is used for rendering, this function has to be called each time the graph
-	* or a section of the graph is updated, before the updated graph data can be send to the GPU for rendering!
-	*/
-	void convertGraphData(uint subgraph_index, std::vector<Node>& nodes, std::vector<Edge>& edges)
-	{
-		vertices.clear();
-		indices.clear();
-
-		// At least as many vertices as there are nodes are required
-		vertices.reserve(nodes.size());
-
-		// Each edge contributes two indices
-		indices.reserve(edges.size()*2);
-
-		// Copy geo coordinates from input nodes to vertices
-		for(auto& node : nodes)
-		{
-			vertices.push_back(Vertex(node.lon,node.lat));
-		}
-
-		std::sort(edges.begin(),edges.end(), [](Edge u, Edge v) { return u.width < v.width; } );
-
-		// Copy indices from edge array to index array
-		std::vector<bool> has_next(nodes.size(), false);
-		std::vector<uint> next(nodes.size(),0);
-		uint width = 0.0;
-		uint counter = 0;
-		for(auto& edge : edges)
-		{
-			uint src_id = edge.source;
-			uint tgt_id = edge.target;
-
-			while(has_next[src_id] && (vertices[src_id].color != edge.color))
-			{
-				src_id = next[src_id];
-			}
-
-			if(vertices[src_id].color == -1)
-			{
-				vertices[src_id].color = edge.color;
-			}
-
-			if(vertices[src_id].color != edge.color)
-			{
-				uint next_id = vertices.size();
-				vertices.push_back(Vertex(vertices[src_id].longitude,vertices[src_id].latitude));
-				vertices[next_id].color = edge.color;
-				has_next.push_back(false);
-				next.push_back(0);
-
-				next[src_id] = next_id;
-				has_next[src_id] = true;
-				src_id = next_id;
-			}
-
-			while(has_next[tgt_id] && (vertices[tgt_id].color != edge.color))
-			{
-				tgt_id = next[tgt_id];
-			}
-
-			if(vertices[tgt_id].color == -1)
-			{
-				vertices[tgt_id].color = edge.color;
-			}
-
-			if(vertices[tgt_id].color != edge.color)
-			{
-				uint next_id = vertices.size();
-				vertices.push_back(Vertex(vertices[tgt_id].longitude,vertices[tgt_id].latitude));
-				vertices[next_id].color = edge.color;
-				has_next.push_back(false);
-				next.push_back(0);
-
-				next[tgt_id] = next_id;
-				has_next[tgt_id] = true;
-				tgt_id = next_id;
-			}
-
-			//std::cout<<"Edge color: "<<edge.color<<std::endl;
-			//std::cout<<"Source color: "<<vertices[src_id].color<<std::endl;
-			//std::cout<<"Target color: "<<vertices[tgt_id].color<<std::endl;
-
-			if(width != edge.width)
-			{
-				subgraphs[subgraph_index].index_offsets.push_back(counter);
-				subgraphs[subgraph_index].line_widths.push_back((float)edge.width);
-				width = edge.width;
-			}
-
-			indices.push_back(src_id);
-			indices.push_back(tgt_id);
-
-			counter += 2;
-		}
-		subgraphs[subgraph_index].index_offsets.push_back(indices.size());
-
-		std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
-	}
-
-};
-
-struct DebugSphere
-{
-	DebugSphere() : va_handle(0), vbo_handle(0), ibo_handle(0) {}
-
-	/* Handle for the vertex array object */
-	GLuint va_handle;
-
-	/* Handle for the vertex buffer object (allows access to vertex data in GPU memory) */
-	GLuint vbo_handle;
-
-	/* Handle for the index buffer objects (allows access to index data in GPU memory) */
-	GLuint ibo_handle;
-
-	void create()
-	{
-		std::vector<float> vertices;
-		std::vector<uint> indices;
-
-		float latitude = -90.0;
-		float longitude = -180.0;
-		for(int i=0; i<50; i=i+1)
-		{
-			for(int j=0; j<100; j=j+1)
-			{
-				float PI = 3.141592653589793238462643383279502884197169399375105820;
-
-				float lat_sin = sin( (PI/180.0f) * latitude);
-				float lon_sin = sin( (PI/180.0f) * longitude);
-
-				float lat_cos = cos( (PI/180.0f) * latitude);
-				float lon_cos = cos( (PI/180.0f) * longitude);
-
-				float r = 1.0; //6378137.0;
-
-				vertices.push_back(lon_sin * lat_cos * r);
-				vertices.push_back(lat_sin * r);
-				vertices.push_back(lat_cos * lon_cos * r);
-
-				longitude += (1/100.0) * 360.0;
-			}
-			latitude += (1/50.0) * 180.0;
-		}
-
-		for(int i=0; i<50*100; i=i+1)
-		{
-			indices.push_back((uint)i);
-		}
-
-		if(vertices.size() < 1 || indices.size() < 1)
-			return;
-
-		auto va_size = sizeof(float) * vertices.size();
-		auto vi_size = sizeof(uint) * indices.size();
-
-		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
-		{
-			glGenVertexArrays(1, &va_handle);
-			glGenBuffers(1, &vbo_handle);
-			glGenBuffers(1, &ibo_handle);
-		}
-
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER,0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(GL_FLOAT)*3, 0);
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-	}
-
-	void draw()
-	{
-		glBindVertexArray(va_handle);
-		glDrawElements(GL_POINTS,  5000,  GL_UNSIGNED_INT,  NULL );
-	}
-};
 
 /**
  * Function to simply read the string of a shader source file from disk
@@ -718,6 +285,802 @@ GLuint createShaderProgram(const char* const vs_path, const char* const fs_path,
 
 }
 
+/**
+ * Collection of functions for loading graphic resources
+ */
+namespace ResourceLoader
+{
+
+	/**
+	 * \brief Read a the header of a ppm image file. Courtesy to the computer vision lecture I attended.
+	 * \param filename Location of the image file
+	 * \param headerEndPos Out parameter, marks the point where the header of the ppm file ends
+	 * \param imgDimX Out parameter, containing the dimension of the image in X direction in pixels
+	 * \param imgDimY Out parameter, containing the dimension of the image in Y direction in pixels
+	 * \return Returns true if the ppm header was succesfully read, false otherwise
+	 */
+	bool readPpmHeader(const char* filename, unsigned long& headerEndPos, int& imgDimX, int& imgDimY)
+{
+	int currentComponent = 0;
+	bool firstline = false;
+	std::string::iterator itr1;
+	std::string::iterator itr2;
+	std::string buffer;
+	std::string compBuffer;
+	std::ifstream file (filename,std::ios::in | std::ios::binary);
+
+	/*
+	/	Check if the file could be opened.
+	*/
+	if(!( file.is_open() ))return false;
+
+	/*
+	/	Go to the beginning of the file and read the first line.
+	*/
+	file.seekg(0, file.beg);
+	std::getline(file,buffer,'\n');
+	itr1 = buffer.begin();
+	for(itr2 = buffer.begin(); itr2 != buffer.end(); itr2++)
+	{
+		/*
+		/	Check if the first line contains more than just ppm's magic number.
+		/	If it does, it should look like this:
+		/	"magic_number image_dimension_x image_dimension_y maximum_value"
+		/	Therefore we scan the string for a space character and start parsing it.
+		*/
+		if(*itr2 == ' ')
+		{
+			if(currentComponent == 0)
+			{
+				/*	The first component is the magic number. We don't need it.	*/
+				currentComponent++;
+				firstline = true;
+				itr1 = (itr2 + 1);
+			}
+			else if(currentComponent == 1)
+			{
+				/*	Get the image dimension in x.	*/
+				compBuffer.assign(itr1, itr2);
+				imgDimX = atoi(compBuffer.c_str());
+				currentComponent++;
+				itr1 = (itr2 + 1);
+			}
+			else if(currentComponent == 2)
+			{
+				/*	Get the image dimension in y.	*/
+				compBuffer.assign(itr1, itr2);
+				imgDimY = atoi(compBuffer.c_str());
+				currentComponent++;
+				itr1 = (itr2 + 1);
+			}
+		}
+	}
+
+	/*
+	/	If the information we were looking for was inside the first line, we are done here.
+	/	Note the position where we left off and exit with return true after closing the file.
+	*/
+	if(firstline)
+	{
+		headerEndPos = static_cast<long>(file.tellg());
+		file.close();
+		return true;
+	}
+
+	/*
+	/	If the information wasn't inside the first line we have to keep reading lines.
+	/	Skip all comment lines (first character = '#').
+	*/
+	std::getline(file,buffer,'\n');
+	while( buffer[0]=='#' || (buffer.size() < 1) )
+	{
+		std::getline(file,buffer,'\n');
+	}
+
+	/*
+	/	Now we should have a string containing the image dimensions and can extract them.
+	*/
+	itr1 = buffer.begin();
+	for(itr2 = buffer.begin(); itr2 != buffer.end(); itr2++)
+	{
+		/*	Get the image dimension in x.	*/
+		if(*itr2 == ' ')
+		{
+			compBuffer.assign(itr1, itr2);
+			imgDimX = atoi(compBuffer.c_str());
+			currentComponent++;
+			itr1 = (itr2 + 1);
+		}
+	}
+
+	/*
+	/	The last component of a line can't be parsed within the loop since it isn't followed by
+	/	a space character, but an end-of-line.
+	/
+	/	Get the image dimension in x.
+	*/
+	compBuffer.assign(itr1, itr2);
+	imgDimY = atoi(compBuffer.c_str());
+
+	/*
+	/	Read one more line. This should contain the maximum value of the image, but we don't need
+	/	that.
+	/	Note down the position after this line and exit with return true after closing the file.
+	*/
+	std::getline(file,buffer,'\n');
+	headerEndPos = static_cast<unsigned long>(file.tellg());
+	file.close();
+	return true;
+}
+	
+	/**
+	 * \brief Read a the data of a ppm image file. Courtesy to the computer vision lecture I attended.
+	 * \param filename Location of the image file
+	 * \param imageData Pointer to the data buffer, that the image data will be written to
+	 * \param dataBegin Marks the location within the ppm file, where the data block begins
+	 * \param imgDimX Dimension of the image in X direction in pixels
+	 * \param imgDimY Dimension of the image in Y direction in pixels
+	 * \return Returns true if the ppm header was succesfully read, false otherwise
+	 */
+	bool readPpmData(const char* filename, char* imageData, unsigned long dataBegin, int imgDimX, int imgDimY)
+{
+	std::ifstream file (filename,std::ios::in | std::ios::binary);
+
+	/*
+	/	Check if the file could be opened.
+	*/
+	if(!( file.is_open() ))return false;
+
+	/*
+	/	Determine the length from the beginning of the image data to the end of the file.
+	*/
+	file.seekg(0, file.end);
+	unsigned long length = static_cast<unsigned long>(file.tellg());
+	length = length - dataBegin;
+	char* buffer = new char[length];
+
+	file.seekg(dataBegin,std::ios::beg);
+	file.read(buffer,length);
+
+	/*
+	/	Rearrange the image information so that the data begins with the lower left corner.
+	*/
+	int k = 0;
+	for(int i=0; i < imgDimY; i++)
+	{
+		int dataLoc = (imgDimY-1-i)*imgDimX*3;
+		for(int j=0; j < imgDimX; j++)
+		{
+			imageData[k]=buffer[dataLoc+(j*3)];
+			k++;
+			imageData[k]=buffer[dataLoc+(j*3)+1];
+			k++;
+			imageData[k]=buffer[dataLoc+(j*3)+2];
+			k++;
+		}
+	}
+
+	file.close();
+	delete[] buffer;
+	return true;
+}
+
+}
+
+/*
+ * Camera (for OpenGL) orbiting a sphere that is centered on the origin
+ */
+struct OrbitalCamera
+{
+	OrbitalCamera() {}
+	~OrbitalCamera() {}
+
+	float longitude;
+	float latitude;
+	float orbit;
+
+	float near;
+	float far;
+	float fovy;
+	float aspect_ratio;
+
+	void moveInOrbit(float delta_lat, float delta_lon, float delta_height)
+	{
+		latitude += delta_lat;
+		longitude += delta_lon;
+		//m_orbit += delta_height;
+
+		orbit =  std::max(1.0f+0.000025f,orbit + delta_height);
+
+		updateViewMatrix();
+	}
+
+	Mat4x4 view_matrix;
+	Mat4x4 projection_matrix;
+
+	void updateProjectionMatrix()
+	{
+		float f = 1.0f / std::tan(fovy / 2.0f);
+        float nf = 1.0f / (near - far);
+		projection_matrix[0] = f / aspect_ratio;
+		projection_matrix[1] = 0;
+		projection_matrix[2] = 0;
+		projection_matrix[3] = 0;
+		projection_matrix[4] = 0;
+		projection_matrix[5] = f;
+		projection_matrix[6] = 0;
+		projection_matrix[7] = 0;
+		projection_matrix[8] = 0;
+		projection_matrix[9] = 0;
+		projection_matrix[10] = (far + near) * nf;
+		projection_matrix[11] = -1;
+		projection_matrix[12] = 0;
+		projection_matrix[13] = 0;
+		projection_matrix[14] = (2 * far * near) * nf;
+		projection_matrix[15] = 0;
+	}
+
+	void updateViewMatrix()
+	{
+		float PI = 3.141592653589793238462643383279502884197169399375105820f;
+
+		float lat_sin = sin( (PI/180.0f) * latitude);
+		float lon_sin = sin( (PI/180.0f) * longitude);
+
+		float lat_cos = cos( (PI/180.0f) * latitude);
+		float lon_cos = cos( (PI/180.0f) * longitude);
+
+		float camera_position[3];
+		camera_position[0] = (lon_sin * lat_cos * orbit);
+		camera_position[1] = (lat_sin * orbit);
+		camera_position[2] = (lat_cos * lon_cos * orbit);
+
+		Mat4x4 lat_rotation({{1.0, 0.0, 0.0, 0.0,
+								0.0, lat_cos, -lat_sin, 0.0,
+								0.0, lat_sin, lat_cos, 0.0,
+								0.0, 0.0, 0.0, 1.0}});
+
+		Mat4x4 lon_rotation({{lon_cos, 0.0, -lon_sin, 0.0,
+								0.0, 1.0, 0.0, 0.0,
+								lon_sin, 0.0, lon_cos, 0.0,
+								0.0, 0.0, 0.0 , 1.0}});
+
+		Mat4x4 rotation_matrix = lon_rotation * lat_rotation;
+
+		rotation_matrix = rotation_matrix.inverse();
+
+		Mat4x4 translation_matrix({{1.0, 0.0, 0.0, 0.0,
+										0.0, 1.0, 0.0, 0.0,
+										0.0, 0.0, 1.0, 0.0,
+										-camera_position[0], -camera_position[1], -camera_position[2], 1.0}});
+
+		view_matrix = rotation_matrix * translation_matrix;
+	}
+};
+
+/**
+ * This struct essentially holds a renderable representation of a subgraph as a mesh, which is made up from
+ * a set of vertices and a set of indices (the latter describing the mesh connectivity).
+ * In this case the mesh uses line primitives, i.e. two succesive indices describe a single line segment.
+ *
+ * From a programming point of view, it makes sense to keep the three OpenGL handles required for a mesh obejct
+ * organised together in a struct as most high level operations like "send the mesh data to the GPU" require
+ * several OpenGL function calls and all of these handles.
+ */
+struct Subgraph
+{
+	Subgraph() : va_handle(0), vbo_handle(0), ibo_handle(0), isVisible(true), index_offsets(), line_widths() {}
+	Subgraph(const Subgraph&) = delete;
+	~Subgraph()
+	{
+		if( va_handle != 0 )
+		{
+			// delete mesh resources
+			glBindVertexArray(va_handle);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+			glDeleteBuffers(1, &ibo_handle);
+			glBindBuffer(GL_ARRAY_BUFFER,0);
+			glDeleteBuffers(1, &vbo_handle);
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &va_handle);
+		}
+	}
+
+	/* Handle for the vertex array object */
+	GLuint va_handle;
+
+	/* Handle for the vertex buffer object (allows access to vertex data in GPU memory) */
+	GLuint vbo_handle;
+
+	/* Handle for the index buffer objects (allows access to index data in GPU memory) */
+	GLuint ibo_handle;
+
+	bool isVisible;
+
+	/* To draw lines of different type, i.e of different width seperatly but still store them
+	 * in the same index buffer object, offsets into the buffer are used to only draw a subset of the index buffer
+	 * in each draw call.
+	 */
+	std::vector<uint> index_offsets;
+	/* Stores the width of each subset of lines */
+	std::vector<float> line_widths;
+
+
+	void loadGraphData(std::vector<Node>& nodes, std::vector<Edge>& edges)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<uint> indices;
+
+		// At least as many vertices as there are nodes are required
+		vertices.reserve(nodes.size());
+	
+		// Each edge contributes two indices
+		indices.reserve(edges.size()*2);
+	
+		// Copy geo coordinates from input nodes to vertices
+		for(auto& node : nodes)
+		{
+			vertices.push_back(Vertex(node.lon,node.lat));
+		}
+	
+		std::sort(edges.begin(),edges.end(), [](Edge u, Edge v) { return u.width < v.width; } );
+	
+		// Copy indices from edge array to index array
+		std::vector<bool> has_next(nodes.size(), false);
+		std::vector<uint> next(nodes.size(),0);
+		uint width = 0;
+		uint counter = 0;
+		for(auto& edge : edges)
+		{
+			uint src_id = edge.source;
+			uint tgt_id = edge.target;
+	
+			while(has_next[src_id] && (vertices[src_id].color != edge.color))
+			{
+				src_id = next[src_id];
+			}
+	
+			if(vertices[src_id].color == -1)
+			{
+				vertices[src_id].color = edge.color;
+			}
+	
+			if(vertices[src_id].color != edge.color)
+			{
+				uint next_id = vertices.size();
+				vertices.push_back(Vertex(vertices[src_id].longitude,vertices[src_id].latitude));
+				vertices[next_id].color = edge.color;
+				has_next.push_back(false);
+				next.push_back(0);
+	
+				next[src_id] = next_id;
+				has_next[src_id] = true;
+				src_id = next_id;
+			}
+	
+			while(has_next[tgt_id] && (vertices[tgt_id].color != edge.color))
+			{
+				tgt_id = next[tgt_id];
+			}
+	
+			if(vertices[tgt_id].color == -1)
+			{
+				vertices[tgt_id].color = edge.color;
+			}
+	
+			if(vertices[tgt_id].color != edge.color)
+			{
+				uint next_id = (uint)vertices.size();
+				vertices.push_back(Vertex(vertices[tgt_id].longitude,vertices[tgt_id].latitude));
+				vertices[next_id].color = edge.color;
+				has_next.push_back(false);
+				next.push_back(0);
+	
+				next[tgt_id] = next_id;
+				has_next[tgt_id] = true;
+				tgt_id = next_id;
+			}
+	
+			//std::cout<<"Edge color: "<<edge.color<<std::endl;
+			//std::cout<<"Source color: "<<vertices[src_id].color<<std::endl;
+			//std::cout<<"Target color: "<<vertices[tgt_id].color<<std::endl;
+	
+			if(width != edge.width)
+			{
+				index_offsets.push_back(counter);
+				line_widths.push_back((float)edge.width);
+				width = edge.width;
+			}
+	
+			indices.push_back(src_id);
+			indices.push_back(tgt_id);
+	
+			counter += 2;
+		}
+		index_offsets.push_back(indices.size());
+
+
+		// Allocate GPU memory and send data
+		if(vertices.size() < 1 || indices.size() < 1)
+			return;
+
+		auto va_size = sizeof(Vertex) * vertices.size();
+		auto vi_size = sizeof(uint) * indices.size();
+
+		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &va_handle);
+			glGenBuffers(1, &vbo_handle);
+			glGenBuffers(1, &ibo_handle);
+		}
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex), 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 1, GL_FLOAT, false, sizeof(Vertex), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	
+		std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
+	}
+
+	void draw(float scale)
+	{
+		//glBindVertexArray(va_handle);
+		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
+
+		for(size_t i=0; i< index_offsets.size()-1; i++)
+		{
+			glLineWidth(std::max(1.0f,line_widths[i] * scale));
+			//glLineWidth(line_widths[i]);
+
+			glBindVertexArray(va_handle);
+			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
+		}
+	}
+};
+
+/**
+ * A graph made up from subgraphs. Limited to rendering edges.
+ * This struct primarily holds a set of subgraphs and offers the neccessary functionality to add and change subgraphs.
+ */
+struct Graph
+{
+	std::vector<std::unique_ptr<Subgraph>> subgraphs;
+
+	void addSubgraph(std::vector<Node>& nodes, std::vector<Edge>& edges)
+	{
+		std::unique_ptr<Subgraph> subgraph(new Subgraph);
+		subgraphs.push_back(std::move(subgraph));
+
+		subgraphs.back()->loadGraphData(nodes,edges);
+	}
+
+	void setVisibilty(uint index, bool visibility)
+	{
+		if(index < subgraphs.size())
+			subgraphs[index]->isVisible = visibility;
+	}
+
+	void draw(float scale)
+	{
+		for(auto& subgraph : subgraphs)
+		{
+			if(subgraph->isVisible)
+				subgraph->draw(scale);
+		}
+	}
+};
+
+struct TextLabels
+{
+	std::array<float,255> u;
+	std::array<float,255> v;
+
+	TextLabels()
+	{
+		std::vector<std::string> atlas_rows;
+
+		atlas_rows.push_back("ABCDEFGHIJKLMN");
+		atlas_rows.push_back("OPQRSTUVWXYZab");
+		atlas_rows.push_back("cdefghijklmnop");
+		atlas_rows.push_back("qrstuvwxyz1234");
+		atlas_rows.push_back("567890&@.,?!'\"");
+		atlas_rows.push_back("\"()*ßöäü-_");
+
+
+		float u_value = 1.0/16.0;
+		float v_value = 5.0/6.0;
+
+		for(std::string& s : atlas_rows)
+		{
+			for(char c : s)
+			{
+				u[c] = u_value;
+				u_value += 1.0/16.0;
+				v[c] = v_value;
+			}
+
+			u_value = 1.0f/16.0f;
+			v_value -= 1.0f/6.0f;
+		}
+
+		// Create basic quad mesh for rendering characters
+		std::array< float, 16 > vertex_array = {{ -0.03,-0.1,0.0,0.0,
+												-0.03,0.1,0.0,1.0,
+												0.03,0.1,1.0,1.0,
+												0.03,-0.1,1.0,0.0 }};
+
+		std::array< GLuint, 6 > index_array = {{ 0,1,2,2,0,3 }};
+
+		glGenVertexArrays(1, &va_handle);
+		glGenBuffers(1, &vbo_handle);
+		glGenBuffers(1, &ibo_handle);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_array), vertex_array.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_array), index_array.data(), GL_STATIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(GL_FLOAT)*4, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(GL_FLOAT)*4, (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// Load text label shader program
+		prgm_handle = createShaderProgram("../src/textLabel_v.glsl","../src/textLabel_f.glsl",{"v_position","v_uv"});
+
+		// Load font atlas
+		unsigned long begin_pos;
+		int x_dim, y_dim;
+		char* img_data;
+		ResourceLoader::readPpmHeader("../resources/font_atlas.ppm", begin_pos, x_dim, y_dim);
+		img_data = new char[x_dim * y_dim * 3];
+		ResourceLoader::readPpmData("../resources/font_atlas.ppm", img_data, begin_pos, x_dim, y_dim);
+
+		glGenTextures(1, &font_atlas_handle);
+		//assert(font_atlas_handle > 0);
+		glBindTexture(GL_TEXTURE_2D, font_atlas_handle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x_dim, y_dim, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data);
+		glBindTexture(GL_TEXTURE_2D,0);
+
+		delete[] img_data;
+
+	}
+	/* Structs and classes that free OpenGL resources within their destructor
+	 * should be non-copyable to prevent bad stuff from happening
+	 */
+	TextLabels(const TextLabels&) = delete;
+	~TextLabels()
+	{
+		// delete mesh resources
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glDeleteBuffers(1, &ibo_handle);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glDeleteBuffers(1, &vbo_handle);
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &va_handle);
+
+		// delete GLSL program
+		glDeleteProgram(prgm_handle);
+
+		// delete font atlas
+		glDeleteTextures(1,&font_atlas_handle);
+
+		for(GLuint tx_handle : text_texture_handles)
+			glDeleteTextures(1,&tx_handle);
+	}
+
+	GLuint va_handle;
+
+	GLuint vbo_handle;
+
+	GLuint ibo_handle;
+
+	GLuint prgm_handle;
+
+	GLuint font_atlas_handle;
+
+	/** Geo-Cooridnates of each label */
+	std::vector<float> geoCoordinates;
+	/** String of of each label encoded as look-up-texture for font altas */
+	std::vector<GLuint> text_texture_handles;
+	/** Number of characters of each label */
+	std::vector<unsigned int> lengths;
+	/** Relative scale of each label */
+	std::vector<float> scales;
+	/** Visibility of each label i.e. rendered or not */
+	std::vector<bool> visibility;
+
+	void addLabel(std::string label_text, float longitude, float latitude, float scale)
+	{
+		geoCoordinates.push_back(latitude);
+		geoCoordinates.push_back(longitude);
+
+		// convert string to text texture (i.e. character to uv position in texture atlas)
+		float* data = new float[label_text.length()*2];
+		for(int i=0; i<label_text.length(); i++)
+		{
+			data[i*2] = u[(int)label_text[i]];
+			data[i*2 + 1] = v[(int)label_text[i]];
+		}
+
+		GLuint texture_handle = 0;
+		glGenTextures(1, &texture_handle);
+		//assert(font_atlas_handle > 0);
+		glBindTexture(GL_TEXTURE_2D, texture_handle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, label_text.length(), 1, 0, GL_RG, GL_FLOAT, data);
+		glBindTexture(GL_TEXTURE_2D,0);
+
+		text_texture_handles.push_back(texture_handle);
+
+		lengths.push_back(label_text.length());
+		scales.push_back(scale);
+		visibility.push_back(true);
+	}
+
+	void draw(OrbitalCamera& camera)
+	{
+		glUseProgram(prgm_handle);
+
+		// bind font atlas texture
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D,font_atlas_handle);
+		int zero = 0;
+		glUniform1iv(glGetUniformLocation(prgm_handle,"fontAtlas_tx2D"),1,&zero);
+
+		for(int i=0; i<visibility.size(); i++)
+		{
+			if(visibility[i])
+			{
+				// set uniforms
+				glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+				glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+				glUniform2fv(glGetUniformLocation(prgm_handle,"label_geoCoords"),1,&geoCoordinates[i*2]);
+				float charCount = (float)lengths[i];
+				glUniform1fv(glGetUniformLocation(prgm_handle,"label_charCount"),1,&charCount);
+				glUniform1fv(glGetUniformLocation(prgm_handle,"label_scale"),1,&scales[i]);
+
+				// bind content texture
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D,text_texture_handles[i]);
+				int one = 1;
+				glUniform1iv(glGetUniformLocation(prgm_handle,"label_text_tx2D"),1,&one);
+
+				glBindVertexArray(va_handle);
+				glDrawElementsInstanced(GL_TRIANGLES,  6,  GL_UNSIGNED_INT,  (void*)NULL, lengths[i]);
+			}
+		}
+	}
+
+
+};
+
+struct DebugSphere
+{
+	DebugSphere() : va_handle(0), vbo_handle(0), ibo_handle(0) {}
+	DebugSphere(const DebugSphere&) = delete;
+	~DebugSphere()
+	{
+		// delete mesh resources
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glDeleteBuffers(1, &ibo_handle);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glDeleteBuffers(1, &vbo_handle);
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &va_handle);
+	}
+
+	/* Handle for the vertex array object */
+	GLuint va_handle;
+
+	/* Handle for the vertex buffer object (allows access to vertex data in GPU memory) */
+	GLuint vbo_handle;
+
+	/* Handle for the index buffer objects (allows access to index data in GPU memory) */
+	GLuint ibo_handle;
+
+	void create()
+	{
+		std::vector<float> vertices;
+		std::vector<uint> indices;
+
+		float latitude = -90.0;
+		float longitude = -180.0;
+		for(int i=0; i<50; i=i+1)
+		{
+			for(int j=0; j<100; j=j+1)
+			{
+				float PI = 3.141592653589793238462643383279502884197169399375105820;
+
+				float lat_sin = sin( (PI/180.0f) * latitude);
+				float lon_sin = sin( (PI/180.0f) * longitude);
+
+				float lat_cos = cos( (PI/180.0f) * latitude);
+				float lon_cos = cos( (PI/180.0f) * longitude);
+
+				float r = 1.0; //6378137.0;
+
+				vertices.push_back(lon_sin * lat_cos * r);
+				vertices.push_back(lat_sin * r);
+				vertices.push_back(lat_cos * lon_cos * r);
+
+				longitude += (1/100.0) * 360.0;
+			}
+			latitude += (1/50.0) * 180.0;
+		}
+
+		for(int i=0; i<50*100; i=i+1)
+		{
+			indices.push_back((uint)i);
+		}
+
+		if(vertices.size() < 1 || indices.size() < 1)
+			return;
+
+		auto va_size = sizeof(float) * vertices.size();
+		auto vi_size = sizeof(uint) * indices.size();
+
+		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &va_handle);
+			glGenBuffers(1, &vbo_handle);
+			glGenBuffers(1, &ibo_handle);
+		}
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(GL_FLOAT)*3, 0);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	void draw()
+	{
+		glBindVertexArray(va_handle);
+		glDrawElements(GL_POINTS,  5000,  GL_UNSIGNED_INT,  NULL );
+	}
+};
 
 void windowSizeCallback(GLFWwindow *window, int width, int height)
 {
@@ -950,81 +1313,106 @@ int main(int argc, char*argv[])
 	 * OpenGL Objects are usaully represented by handles.
 	 * From my understanding, these are basically pointers/adresses to something
 	 * the GPU (or GPU driver) owns.
-	 */
+	 *
+	 * Instances of structs holding OpenGL handles are created within an additional
+	 * scope, so that they are destroyed while the OpenGL context is still alive
+	 */	
+	{
+		/* Create GLSL programs */
+		GLuint shader_prgm_handle = createShaderProgram("../src/edge_v.glsl","../src/edge_f.glsl",{"v_geoCoords","v_color"});
+		GLuint debug_prgm_handle = createShaderProgram("../src/debug_v.glsl","../src/debug_f.glsl",{"v_position"});
 
-	/* Create GLSL program */
-	GLuint shader_prgm_handle = createShaderProgram("../src/edge_v.glsl","../src/edge_f.glsl",{"v_geoCoords","v_color"});
-	GLuint debug_prgm_handle = createShaderProgram("../src/debug_v.glsl","../src/debug_f.glsl",{"v_position"});
+		//GLenum glerror = glGetError();
+		//std::cout<<glerror<<std::endl;
 
-	//GLenum glerror = glGetError();
-	//std::cout<<glerror<<std::endl;
+		/* Create renderable graph (mesh) */
+		Graph lineGraph;
+		lineGraph.addSubgraph(nodes,edges);
 
-	/* Create renderable graph (mesh) */
-	GfxGraph lineGraph;
-	lineGraph.addSubgraph(nodes,edges);
+		/* Create a orbital camera */
+		OrbitalCamera camera;
+		camera.longitude = 0.0;
+		camera.latitude = 0.0;
+		camera.orbit = 5.0;
+		camera.near = 0.0001;
+		camera.far = 10.0;
+		camera.fovy = 30.0 * 3.14/180.0f;
+		camera.aspect_ratio = 16.0/9.0;
 
-	/* Create a orbital camera */
-	OrbitalCamera camera;
-	camera.longitude = 0.0;
-	camera.latitude = 0.0;
-	camera.orbit = 5.0;
-	camera.near = 0.0001;
-	camera.far = 10.0;
-	camera.fovy = 30.0 * 3.14/180.0f;
-	camera.aspect_ratio = 16.0/9.0;
+		camera.updateViewMatrix();
+		camera.updateProjectionMatrix();
 
-	camera.updateViewMatrix();
-	camera.updateProjectionMatrix();
+		/* Make camera accessable in window callbacks */
+		glfwSetWindowUserPointer(window,&camera);
 
-	/* Make camera accessable in window callbacks */
-	glfwSetWindowUserPointer(window,&camera);
+		/* Create text labels */
+		TextLabels labels;
 
-	/* Create the debug sphere */
-	DebugSphere db_sphere;
-	db_sphere.create();
+		for(int lon=-180; lon<=180 ; lon++)
+			labels.addLabel(std::to_string(lon),0.0,lon,0.25);
 
+		for(int lat=-90; lat<=90 ; lat++)
+			labels.addLabel(std::to_string(lat),lat,0.0,0.25);
 
-	//////////////////////////////////////////////////////
-	// Render Loop - Each loop iteration renders one frame
-	//////////////////////////////////////////////////////
-
-    /* Loop until the user closes the window */
-    while (!glfwWindowShouldClose(window))
-    {
-		Controls::updateOrbitalCamera(window);
-
-        /* Render here */
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		int width, height;
-		glfwGetFramebufferSize(window, &width, &height);
-		glViewport(0, 0, width, height);
-
-		glUseProgram(debug_prgm_handle);
-
-		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
-		glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
-
-		glPointSize(2.0);
-		db_sphere.draw();
+		/* Create the debug sphere */
+		DebugSphere db_sphere;
+		db_sphere.create();
 
 
-		glUseProgram(shader_prgm_handle);
+		//////////////////////////////////////////////////////
+		// Render Loop - Each loop iteration renders one frame
+		//////////////////////////////////////////////////////
 
-		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
-		glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+		glEnable(GL_BLEND);
+		//glDisable(GL_CULL_FACE);
+		//glDisable(GL_DEPTH_TEST);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-		float scale = std::min((0.0025/(camera.orbit - 1.0f)),2.0);
+		/* Loop until the user closes the window */
+		while (!glfwWindowShouldClose(window))
+		{
+			Controls::updateOrbitalCamera(window);
 
-		lineGraph.draw( scale );
+		    /* Render here */
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			int width, height;
+			glfwGetFramebufferSize(window, &width, &height);
+			glViewport(0, 0, width, height);
 
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);
+			glUseProgram(debug_prgm_handle);
 
-        /* Poll for and process events */
-        glfwPollEvents();
-    }
+			glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+			glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+			glPointSize(2.0);
+			db_sphere.draw();
+
+
+			glUseProgram(shader_prgm_handle);
+
+			glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+			glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+			float scale = std::min((0.0025/(camera.orbit - 1.0f)),2.0);
+
+			lineGraph.draw( scale );
+
+			labels.draw(camera);
+
+		    /* Swap front and back buffers */
+		    glfwSwapBuffers(window);
+
+		    /* Poll for and process events */
+		    glfwPollEvents();
+		}
+
+
+		// delete/free graphics resources
+		glDeleteProgram(shader_prgm_handle);
+		glDeleteProgram(debug_prgm_handle);
+	}
 
     glfwTerminate();
     return 0;
