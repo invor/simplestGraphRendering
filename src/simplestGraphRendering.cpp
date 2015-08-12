@@ -294,7 +294,7 @@ GLuint compileShader(const std::string * const source, GLenum shaderType)
  * \attribute attributes Vertex shader input attributes (i.e. vertex layout)
  * \return Returns the handle of the created GLSL program
  */
-GLuint createShaderProgram(const char* const vs_path, const char* const fs_path, std::vector<const char* const> attributes)
+GLuint createShaderProgram(const char* vs_path, const char* fs_path, std::vector<const char*> attributes)
 {
 	/* Create a shader program object */
 	GLuint handle;
