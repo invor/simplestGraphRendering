@@ -972,7 +972,7 @@ struct TextLabels
 		atlas_rows.push_back("cdefghijklmnop");
 		atlas_rows.push_back("qrstuvwxyz1234");
 		atlas_rows.push_back("567890&@.,?!'\"");
-		atlas_rows.push_back("\"()*ßöäü-_");
+		atlas_rows.push_back("\"()*ÃŸÃ¶Ã¤Ã¼-_");
 
 
 		float u_value = 1.0/16.0;
