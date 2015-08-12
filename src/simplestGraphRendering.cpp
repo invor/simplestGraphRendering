@@ -304,7 +304,7 @@ GLuint createShaderProgram(const char* const vs_path, const char* const fs_path,
 	 * The vertices intended to be used with this program will have to match that index in their
 	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
 	 */
-	for(int i=0; i<attributes.size(); i++)
+	for(size_t i=0; i<attributes.size(); i++)
 		glBindAttribLocation(handle, i, attributes[i]);
 
 	/* Read the shader source files */
@@ -1098,7 +1098,7 @@ struct TextLabels
 
 		// convert string to text texture (i.e. character to uv position in texture atlas)
 		float* data = new float[label_text.length()*2];
-		for(int i=0; i<label_text.length(); i++)
+		for(size_t i=0; i<label_text.length(); i++)
 		{
 			data[i*2] = u[(int)label_text[i]];
 			data[i*2 + 1] = v[(int)label_text[i]];
@@ -1132,7 +1132,7 @@ struct TextLabels
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(prgm_handle,"fontAtlas_tx2D"),1,&zero);
 
-		for(int i=0; i<visibility.size(); i++)
+		for(size_t i=0; i<visibility.size(); i++)
 		{
 			if(visibility[i])
 			{
