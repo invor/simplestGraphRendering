@@ -1,4 +1,6 @@
-#version 140
+#version 130
+
+#extension GL_EXT_draw_instanced : enable
 
 #define PI 3.1415926535897932384
 
