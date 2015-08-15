@@ -980,7 +980,7 @@ struct TextLabels
 
 		for(std::string& s : atlas_rows)
 		{
-			for(char c : s)
+			for(unsigned char c : s)
 			{
 				u[c] = u_value;
 				u_value += 1.0/16.0;
