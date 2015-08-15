@@ -57,7 +57,7 @@ namespace Math
 		Mat4x4 b(m);
 
 		return Mat4x4(
-			{{	// first row
+			std::array<float,16>({	// first row
 				data[0]*b[0] + data[4]*b[1] + data[8]*b[2] + data[12]*b[3],
 				data[1]*b[0] + data[5]*b[1] + data[9]*b[2] + data[13]*b[3],
 				data[2]*b[0] + data[6]*b[1] + data[10]*b[2] + data[14]*b[3],
@@ -77,7 +77,7 @@ namespace Math
 				data[1]*b[12] + data[5]*b[13] + data[9]*b[14] + data[13]*b[15],
 				data[2]*b[12] + data[6]*b[13] + data[10]*b[14] + data[14]*b[15],
 				data[3]*b[12] + data[7]*b[13] + data[11]*b[14] + data[15]*b[15],
-			}}
+			})
 		);
 	}
 	
@@ -110,7 +110,7 @@ namespace Math
 			// The inverse is used as multiplication factor
 		    det = 1.0f / det;
 
-		    return Mat4x4({{	(a11 * b11 - a12 * b10 + a13 * b09) * det,
+		    return Mat4x4(std::array<float,16>({	(a11 * b11 - a12 * b10 + a13 * b09) * det,
 						(a02 * b10 - a01 * b11 - a03 * b09) * det,
 						(a31 * b05 - a32 * b04 + a33 * b03) * det,
 						(a22 * b04 - a21 * b05 - a23 * b03) * det,
@@ -125,7 +125,7 @@ namespace Math
 						(a11 * b07 - a10 * b09 - a12 * b06) * det,
 						(a00 * b09 - a01 * b07 + a02 * b06) * det,
 						(a31 * b01 - a30 * b03 - a32 * b00) * det,
-						(a20 * b03 - a21 * b01 + a22 * b00) * det	}});
+						(a20 * b03 - a21 * b01 + a22 * b00) * det}));
 		}
 	};
 
@@ -294,7 +294,7 @@ GLuint compileShader(const std::string * const source, GLenum shaderType)
  * \attribute attributes Vertex shader input attributes (i.e. vertex layout)
  * \return Returns the handle of the created GLSL program
  */
-GLuint createShaderProgram(const char* const vs_path, const char* const fs_path, std::vector<const char* const> attributes)
+GLuint createShaderProgram(const char* vs_path, const char* fs_path, std::vector<const char*> attributes)
 {
 	/* Create a shader program object */
 	GLuint handle;
@@ -304,7 +304,7 @@ GLuint createShaderProgram(const char* const vs_path, const char* const fs_path,
 	 * The vertices intended to be used with this program will have to match that index in their
 	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
 	 */
-	for(int i=0; i<attributes.size(); i++)
+	for(size_t i=0; i<attributes.size(); i++)
 		glBindAttribLocation(handle, i, attributes[i]);
 
 	/* Read the shader source files */
@@ -619,24 +619,24 @@ struct OrbitalCamera
 		camera_position[1] = (lat_sin * orbit);
 		camera_position[2] = (lat_cos * lon_cos * orbit);
 
-		Math::Mat4x4 lat_rotation({{1.0, 0.0, 0.0, 0.0,
+		Math::Mat4x4 lat_rotation(std::array<float,16>({1.0, 0.0, 0.0, 0.0,
 								0.0, lat_cos, -lat_sin, 0.0,
 								0.0, lat_sin, lat_cos, 0.0,
-								0.0, 0.0, 0.0, 1.0}});
+								0.0, 0.0, 0.0, 1.0}));
 
-		Math::Mat4x4 lon_rotation({{lon_cos, 0.0, -lon_sin, 0.0,
+		Math::Mat4x4 lon_rotation(std::array<float,16>({lon_cos, 0.0, -lon_sin, 0.0,
 								0.0, 1.0, 0.0, 0.0,
 								lon_sin, 0.0, lon_cos, 0.0,
-								0.0, 0.0, 0.0 , 1.0}});
+								0.0, 0.0, 0.0 , 1.0}));
 
 		Math::Mat4x4 rotation_matrix = lon_rotation * lat_rotation;
 
 		rotation_matrix = rotation_matrix.inverse();
 
-		Math::Mat4x4 translation_matrix({{1.0, 0.0, 0.0, 0.0,
+		Math::Mat4x4 translation_matrix(std::array<float,16>({1.0, 0.0, 0.0, 0.0,
 										0.0, 1.0, 0.0, 0.0,
 										0.0, 0.0, 1.0, 0.0,
-										-camera_position[0], -camera_position[1], -camera_position[2], 1.0}});
+										-camera_position[0], -camera_position[1], -camera_position[2], 1.0}));
 
 		view_matrix = rotation_matrix * translation_matrix;
 	}
@@ -972,7 +972,7 @@ struct TextLabels
 		atlas_rows.push_back("cdefghijklmnop");
 		atlas_rows.push_back("qrstuvwxyz1234");
 		atlas_rows.push_back("567890&@.,?!'\"");
-		atlas_rows.push_back("\"()*ßöäü-_");
+		atlas_rows.push_back("\"()*ÃŸÃ¶Ã¤Ã¼-_");
 
 
 		float u_value = 1.0/16.0;
@@ -1098,7 +1098,7 @@ struct TextLabels
 
 		// convert string to text texture (i.e. character to uv position in texture atlas)
 		float* data = new float[label_text.length()*2];
-		for(int i=0; i<label_text.length(); i++)
+		for(size_t i=0; i<label_text.length(); i++)
 		{
 			data[i*2] = u[(int)label_text[i]];
 			data[i*2 + 1] = v[(int)label_text[i]];
@@ -1132,7 +1132,7 @@ struct TextLabels
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(prgm_handle,"fontAtlas_tx2D"),1,&zero);
 
-		for(int i=0; i<visibility.size(); i++)
+		for(size_t i=0; i<visibility.size(); i++)
 		{
 			if(visibility[i])
 			{
