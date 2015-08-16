@@ -783,6 +783,9 @@ struct Subgraph
 
 	void loadGraphData(std::vector<Node>& nodes, std::vector<Edge>& edges)
 	{
+		index_offsets.clear();
+		line_widths.clear();
+
 		std::vector<Vertex> vertices;
 		std::vector<uint> indices;
 
@@ -891,9 +894,9 @@ struct Subgraph
 
 		glBindVertexArray(va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_DYNAMIC_DRAW);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_DYNAMIC_DRAW);
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER,0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
