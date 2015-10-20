@@ -8,7 +8,7 @@
 #include <string>
 #include <algorithm>
 #include <iostream>
-#include<iomanip>
+#include <iomanip>
 #include <memory>
 
 typedef unsigned int uint;
@@ -910,7 +910,7 @@ struct Subgraph
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	
-		std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
+		//std::cout<<"GfxGraph consisting of "<<vertices.size()<<" vertices and "<<indices.size()<<" indices"<<std::endl;
 	}
 
 	void draw(float scale)
@@ -994,23 +994,16 @@ struct TextLabels
 			v_value -= 1.0f/6.0f;
 		}
 
-		// Create basic quad mesh for rendering characters
-		std::array< float, 16 > vertex_array = {{ -0.03,-0.1,0.0,0.0,
-												-0.03,0.1,0.0,1.0,
-												0.03,0.1,1.0,1.0,
-												0.03,-0.1,1.0,0.0 }};
-
-		std::array< GLuint, 6 > index_array = {{ 0,1,2,2,0,3 }};
-
+		// Generate vertex and index buffer array and allocate enough space for 10000 labels
 		glGenVertexArrays(1, &va_handle);
 		glGenBuffers(1, &vbo_handle);
 		glGenBuffers(1, &ibo_handle);
 
 		glBindVertexArray(va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_array), vertex_array.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)* 16 * 10000, NULL, GL_STATIC_DRAW); //each label uses vertex data worth 16 floats
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(index_array), index_array.data(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)* 6 * 10000, NULL, GL_STATIC_DRAW); //each label uses 6 indices
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER,0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1083,6 +1076,9 @@ struct TextLabels
 
 	GLuint font_atlas_handle;
 
+	/** Total number of labels */
+	uint num_labels;
+
 	/** Geo-Cooridnates of each label */
 	std::vector<float> geoCoordinates;
 	/** String of of each label encoded as look-up-texture for font altas */
@@ -1093,9 +1089,38 @@ struct TextLabels
 	std::vector<float> scales;
 	/** Visibility of each label i.e. rendered or not */
 	std::vector<bool> visibility;
+	/** Index array offset to beginning of label */
+	std::vector<uint> offsets;
 
 	void addLabel(std::string label_text, float latitude, float longitude, float scale)
 	{
+		if(num_labels < 10000)
+		{
+
+		num_labels++;
+
+		// Create basic quad mesh for rendering characters
+		float x_min = (-0.03 * label_text.length());
+		float x_max = (0.03 * label_text.length());
+		std::array< float, 16 > vertex_array = {{ x_min,-0.1,0.0,0.0,
+												x_min,0.1,0.0,1.0,
+												x_max,0.1,1.0,1.0,
+												x_max,-0.1,1.0,0.0 }};
+		uint offset = num_labels * 4;
+		std::array< GLuint, 6 > index_array = {{ offset+0,offset+1,offset+2,offset+2,offset+0,offset+3 }};
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferSubData(GL_ARRAY_BUFFER, num_labels * sizeof(vertex_array), sizeof(vertex_array), vertex_array.data()); //each label uses vertex data worth 16 floats
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, num_labels * sizeof(index_array), sizeof(index_array), index_array.data()); //each label uses 6 indices
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		offsets.push_back(num_labels * sizeof(index_array));
+
+
 		geoCoordinates.push_back(longitude);
 		geoCoordinates.push_back(latitude);
 
@@ -1123,6 +1148,8 @@ struct TextLabels
 		lengths.push_back(label_text.length());
 		scales.push_back(scale);
 		visibility.push_back(true);
+
+		}
 	}
 
 	void draw(OrbitalCamera& camera)
@@ -1134,6 +1161,8 @@ struct TextLabels
 		glBindTexture(GL_TEXTURE_2D,font_atlas_handle);
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(prgm_handle,"fontAtlas_tx2D"),1,&zero);
+
+		glBindVertexArray(va_handle);
 
 		for(size_t i=0; i<visibility.size(); i++)
 		{
@@ -1154,8 +1183,7 @@ struct TextLabels
 				int one = 1;
 				glUniform1iv(glGetUniformLocation(prgm_handle,"label_text_tx2D"),1,&one);
 
-				glBindVertexArray(va_handle);
-				glDrawElementsInstanced(GL_TRIANGLES,  6,  GL_UNSIGNED_INT,  (void*)NULL, lengths[i]);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*) offsets[i]);
 			}
 		}
 	}

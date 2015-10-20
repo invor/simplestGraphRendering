@@ -1,7 +1,5 @@
 #version 130
 
-#extension GL_EXT_draw_instanced : enable
-
 #define PI 3.1415926535897932384
 
 uniform mat4 view_matrix;
@@ -9,8 +7,6 @@ uniform mat4 projection_matrix;
 
 uniform vec2 label_geoCoords;
 uniform float label_scale;
-uniform float label_charCount;
-uniform sampler2D label_text_tx2D;
 
 in vec2 v_position;
 in vec2 v_uv;
@@ -49,14 +45,10 @@ void main()
 	vec4 ccs_position = view_matrix * vec4(world_position,1.0);
 	// build base quad for each character in NDCS and add horizontal offset of char position in string
 	ccs_position += vec4(v_position*label_scale*ccs_scale,0.0,0.0);
-	// to center lable on geoCoords, shift label to the left first
-	ccs_position -= vec4( (0.06*label_scale*ccs_scale) * (label_charCount/2.0) ,0.0,0.0,0.0); 
-	ccs_position += vec4( (0.06*label_scale*ccs_scale) * float(gl_InstanceID) ,0.0,0.0,0.0);
 	
 	vec4 dcs_position = projection_matrix * ccs_position;
-								
-	float label_text_x = (float(gl_InstanceID)+(0.5/label_charCount))/label_charCount;
-	uv = texture(label_text_tx2D,vec2(label_text_x,0.5)).xy + (v_uv*vec2(1.0/16.0,1.0/6.0));
+	
+	uv = v_uv;
 	
 	gl_Position = dcs_position;
 }
