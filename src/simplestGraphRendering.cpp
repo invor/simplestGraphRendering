@@ -10,12 +10,42 @@
 #include <iostream>
 #include <iomanip>
 #include <memory>
+#include <map>
+#include <list>
 
 typedef unsigned int uint;
 
 namespace Math
 {
 	#define PI 3.141592653589793238462643383279502884197169399375105820f
+
+	struct Vec2
+	{
+		Vec2() : x(0.0), y(0.0) {}
+		Vec2(float x, float y) : x(x), y(y){}
+
+		float x, y;
+
+		Vec2 operator* (const float a)
+		{
+			return Vec2(a*x,a*y);
+		}
+
+		Vec2 operator+ (const Vec2& v)
+		{
+			return Vec2(x+v.x,y+v.y);
+		}
+
+		Vec2 operator- (const Vec2& v)
+		{
+			return Vec2(x-v.x,y-v.y);
+		}
+
+		float length() const
+		{
+			return std::sqrt(x*x+y*y);
+		}
+	};
 
 	struct Vec3
 	{
@@ -34,6 +64,11 @@ namespace Math
 			return Vec3(x+v.x,y+v.y,z+v.z);
 		}
 
+		Vec3 operator- (const Vec3& v)
+		{
+			return Vec3(x-v.x,y-v.y,z-v.z);
+		}
+
 		float length() const
 		{
 			return std::sqrt(x*x+y*y+z*z);
@@ -48,38 +83,38 @@ namespace Math
 		std::array<float,16> data;
 	
 		float& operator[] (int index)
-	{
-		return data[index];
-	}
+		{
+			return data[index];
+		}
 	
 		Mat4x4 operator* (const Mat4x4& m)
-	{
-		Mat4x4 b(m);
+		{
+			Mat4x4 b(m);
 
-		return Mat4x4(
-			std::array<float,16>({	// first row
-				data[0]*b[0] + data[4]*b[1] + data[8]*b[2] + data[12]*b[3],
-				data[1]*b[0] + data[5]*b[1] + data[9]*b[2] + data[13]*b[3],
-				data[2]*b[0] + data[6]*b[1] + data[10]*b[2] + data[14]*b[3],
-				data[3]*b[0] + data[7]*b[1] + data[11]*b[2] + data[15]*b[3],
-				// second row
-				data[0]*b[4] + data[4]*b[5] + data[8]*b[6] + data[12]*b[7],
-				data[1]*b[4] + data[5]*b[5] + data[9]*b[6] + data[13]*b[7],
-				data[2]*b[4] + data[6]*b[5] + data[10]*b[6] + data[14]*b[7],
-				data[3]*b[4] + data[7]*b[5] + data[11]*b[6] + data[15]*b[7],
-				// third row
-				data[0]*b[8] + data[4]*b[9] + data[8]*b[10] + data[12]*b[11],
-				data[1]*b[8] + data[5]*b[9] + data[9]*b[10] + data[13]*b[11],
-				data[2]*b[8] + data[6]*b[9] + data[10]*b[10] + data[14]*b[11],
-				data[3]*b[8] + data[7]*b[9] + data[11]*b[10] + data[15]*b[11],
-				// fourth row
-				data[0]*b[12] + data[4]*b[13] + data[8]*b[14] + data[12]*b[15],
-				data[1]*b[12] + data[5]*b[13] + data[9]*b[14] + data[13]*b[15],
-				data[2]*b[12] + data[6]*b[13] + data[10]*b[14] + data[14]*b[15],
-				data[3]*b[12] + data[7]*b[13] + data[11]*b[14] + data[15]*b[15],
-			})
-		);
-	}
+			return Mat4x4(
+				std::array<float,16>({	// first row
+					data[0]*b[0] + data[4]*b[1] + data[8]*b[2] + data[12]*b[3],
+					data[1]*b[0] + data[5]*b[1] + data[9]*b[2] + data[13]*b[3],
+					data[2]*b[0] + data[6]*b[1] + data[10]*b[2] + data[14]*b[3],
+					data[3]*b[0] + data[7]*b[1] + data[11]*b[2] + data[15]*b[3],
+					// second row
+					data[0]*b[4] + data[4]*b[5] + data[8]*b[6] + data[12]*b[7],
+					data[1]*b[4] + data[5]*b[5] + data[9]*b[6] + data[13]*b[7],
+					data[2]*b[4] + data[6]*b[5] + data[10]*b[6] + data[14]*b[7],
+					data[3]*b[4] + data[7]*b[5] + data[11]*b[6] + data[15]*b[7],
+					// third row
+					data[0]*b[8] + data[4]*b[9] + data[8]*b[10] + data[12]*b[11],
+					data[1]*b[8] + data[5]*b[9] + data[9]*b[10] + data[13]*b[11],
+					data[2]*b[8] + data[6]*b[9] + data[10]*b[10] + data[14]*b[11],
+					data[3]*b[8] + data[7]*b[9] + data[11]*b[10] + data[15]*b[11],
+					// fourth row
+					data[0]*b[12] + data[4]*b[13] + data[8]*b[14] + data[12]*b[15],
+					data[1]*b[12] + data[5]*b[13] + data[9]*b[14] + data[13]*b[15],
+					data[2]*b[12] + data[6]*b[13] + data[10]*b[14] + data[14]*b[15],
+					data[3]*b[12] + data[7]*b[13] + data[11]*b[14] + data[15]*b[15],
+				})
+			);
+		}
 	
 		Mat4x4 inverse()
 		{
@@ -129,6 +164,24 @@ namespace Math
 		}
 	};
 
+	struct Mat2x2
+	{
+		Mat2x2() : data() {}
+		Mat2x2(const std::array<float,4> data) : data(data) {}
+
+		std::array<float,4> data;
+
+		float& operator[] (int index)
+		{
+			return data[index];
+		}
+
+		Vec2 operator* (const Vec2& v)
+		{
+			return Vec2( data[0]*v.x+data[2]*v.y, data[1]*v.x+data[3]*v.y );
+		}
+	};
+
 	Vec3 operator* (const float a, const Vec3& v)
 	{
 		return Vec3(a*v.x,a*v.y,a*v.z);
@@ -142,6 +195,11 @@ namespace Math
 	float dot(const Vec3& u, const Vec3& v)
 	{
 		return (u.x*v.x + u.y*v.y + u.z*v.z);
+	}
+
+	float dot(const Vec2& u, const Vec2& v)
+	{
+		return (u.x*v.x + u.y*v.y);
 	}
 
 	double dot64(const Vec3& u, const Vec3& v)
@@ -551,7 +609,7 @@ namespace ResourceLoader
  */
 struct OrbitalCamera
 {
-	OrbitalCamera() : longitude(0.0f), latitude(0.0f), orbit(5.0f), near(0.1f), far(10.0f), fovy(1.0), aspect_ratio(1.0) {}
+	OrbitalCamera() : longitude(0.0f), latitude(0.0f), orbit(5.0f), near(0.01f), far(10.0f), fovy(1.0), aspect_ratio(1.0) {}
 	~OrbitalCamera() {}
 
 	float longitude;
@@ -784,6 +842,7 @@ struct Subgraph
 	void loadGraphData(std::vector<Node>& nodes, std::vector<Edge>& edges)
 	{
 		index_offsets.clear();
+		index_offsets.push_back(0);
 		line_widths.clear();
 
 		std::vector<Vertex> vertices;
@@ -798,7 +857,7 @@ struct Subgraph
 		// Copy geo coordinates from input nodes to vertices
 		for(auto& node : nodes)
 		{
-			vertices.push_back(Vertex(node.lon,node.lat));
+			vertices.push_back(Vertex((float)node.lon,(float)node.lat));
 		}
 	
 		std::sort(edges.begin(),edges.end(), [](Edge u, Edge v) { return u.width < v.width; } );
@@ -820,14 +879,14 @@ struct Subgraph
 	
 			if(vertices[src_id].color == -1)
 			{
-				vertices[src_id].color = edge.color;
+				vertices[src_id].color = (float)edge.color;
 			}
 	
 			if(vertices[src_id].color != edge.color)
 			{
-				uint next_id = vertices.size();
+				uint next_id = (uint)vertices.size();
 				vertices.push_back(Vertex(vertices[src_id].longitude,vertices[src_id].latitude));
-				vertices[next_id].color = edge.color;
+				vertices[next_id].color = (float)edge.color;
 				has_next.push_back(false);
 				next.push_back(0);
 	
@@ -843,14 +902,14 @@ struct Subgraph
 	
 			if(vertices[tgt_id].color == -1)
 			{
-				vertices[tgt_id].color = edge.color;
+				vertices[tgt_id].color = (float)edge.color;
 			}
 	
 			if(vertices[tgt_id].color != edge.color)
 			{
 				uint next_id = (uint)vertices.size();
 				vertices.push_back(Vertex(vertices[tgt_id].longitude,vertices[tgt_id].latitude));
-				vertices[next_id].color = edge.color;
+				vertices[next_id].color = (float)edge.color;
 				has_next.push_back(false);
 				next.push_back(0);
 	
@@ -875,7 +934,7 @@ struct Subgraph
 	
 			counter += 2;
 		}
-		index_offsets.push_back(indices.size());
+		index_offsets.push_back( (uint)indices.size() );
 
 
 		// Allocate GPU memory and send data
@@ -918,49 +977,117 @@ struct Subgraph
 		//glBindVertexArray(va_handle);
 		//glDrawElements(GL_LINES, indices.size(),  GL_UNSIGNED_INT,  0 );
 
+		glBindVertexArray(va_handle);
+
 		for(size_t i=0; i< index_offsets.size()-1; i++)
 		{
 			glLineWidth(std::max(1.0f,line_widths[i] * scale));
 			//glLineWidth(line_widths[i]);
 
-			glBindVertexArray(va_handle);
 			glDrawElements(GL_LINES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
 		}
 	}
 };
 
 /**
- * A graph made up from subgraphs. Limited to rendering edges.
+ * A graph made up from subgraphs, that can be arranged on multiple layers. Limited to rendering edges.
  * This struct primarily holds a set of subgraphs and offers the neccessary functionality to add and change subgraphs.
  */
 struct Graph
 {
-	std::vector<std::unique_ptr<Subgraph>> subgraphs;
-
+	/**
+	 * Add a new subgraph. Defaults to layer 0.
+	 * \param nodes Set of nodes of the new subgraph.
+	 * \param edges Set of edges of the new subgraph.
+	 */
 	void addSubgraph(std::vector<Node>& nodes, std::vector<Edge>& edges)
 	{
 		std::unique_ptr<Subgraph> subgraph(new Subgraph);
 		subgraphs.push_back(std::move(subgraph));
 
 		subgraphs.back()->loadGraphData(nodes,edges);
+
+		auto itr = layers.insert(std::pair<uint,std::list<uint>>(0,std::list<uint>()));
+		itr.first->second.push_back(subgraphs.size()-1);
 	}
 
+	/**
+	 * Add a new subgraph on a given layer. If the layer index doesn't exist, a new layer is created.
+	 * \param nodes Set of nodes of the new subgraph.
+	 * \param edges Set of edges of the new subgraph.
+	 * \param layer Layer to place the new subgraph on. If layer doesn't exist yet, it is automatically created.
+	 */
+	void addSubgraph(std::vector<Node>& nodes, std::vector<Edge>& edges, uint layer)
+	{
+		std::unique_ptr<Subgraph> subgraph(new Subgraph);
+		subgraphs.push_back(std::move(subgraph));
+
+		subgraphs.back()->loadGraphData(nodes,edges);
+
+		auto itr = layers.insert(std::pair<uint,std::list<uint>>(layer,std::list<uint>()));
+		itr.first->second.push_back(subgraphs.size()-1);
+	}
+
+	/**
+	 * Set visibily of a given subgraph.
+	 * \param index Target subgraph index
+	 * \param visibility If set to false, subgraph will not be rendered.
+	 */
 	void setVisibilty(uint index, bool visibility)
 	{
 		if(index < subgraphs.size())
 			subgraphs[index]->isVisible = visibility;
 	}
 
+	/**
+	 * Set layer of a given subgraph.
+	 * \param index Target subgraph index
+	 * \param layer Layer that the subgraph is assigned to.
+	 */
+	void setLayer(uint index, uint layer)
+	{
+		//TODO find cleaner solution
+		for(auto& layer : layers)
+			for(auto itr = layer.second.begin(); itr != layer.second.end(); itr++)
+				if(*itr == index)
+					layer.second.erase(itr);
+
+		auto itr = layers.insert(std::pair<uint,std::list<uint>>(layer,std::list<uint>()));
+		itr.first->second.push_back(index);
+	}
+
+	/**
+	 * Draw all subgraphs, that are set to visible.
+	 * The draw order depends on layers and -within each layer- on edge type.
+	 * \param scale Additonal scale factor for edge widths.
+	 */
 	void draw(float scale)
 	{
-		for(auto& subgraph : subgraphs)
+		for(auto& layer : layers)
 		{
-			if(subgraph->isVisible)
-				subgraph->draw(scale);
+			for(auto& subgraph_idx : layer.second)
+			{
+				if(subgraphs[subgraph_idx]->isVisible)
+					subgraphs[subgraph_idx]->draw(scale);
+			}
 		}
 	}
+
+private:
+	/**
+	 * Actual (Linear) storage of all subgraphs.
+	 */
+	std::vector<std::unique_ptr<Subgraph>> subgraphs;
+
+	/**
+	 * List of subgraphs (given by index) per layer.
+	 */
+	std::map<uint,std::list<uint>> layers;
 };
 
+/**
+ * Collection of test labels on the map.
+ */
 struct TextLabels
 {
 	std::array<float,255> u;
@@ -978,15 +1105,15 @@ struct TextLabels
 		atlas_rows.push_back("\"()*ßöäü-_");
 
 
-		float u_value = 1.0/16.0;
-		float v_value = 5.0/6.0;
+		float u_value = 1.0f/16.0f;
+		float v_value = 5.0f/6.0f;
 
 		for(std::string& s : atlas_rows)
 		{
 			for(unsigned char c : s)
 			{
 				u[c] = u_value;
-				u_value += 1.0/16.0;
+				u_value += 1.0f/16.0f;
 				v[c] = v_value;
 			}
 
@@ -1100,12 +1227,12 @@ struct TextLabels
 		num_labels++;
 
 		// Create basic quad mesh for rendering characters
-		float x_min = (-0.03 * label_text.length());
-		float x_max = (0.03 * label_text.length());
-		std::array< float, 16 > vertex_array = {{ x_min,-0.1,0.0,0.0,
-												x_min,0.1,0.0,1.0,
-												x_max,0.1,1.0,1.0,
-												x_max,-0.1,1.0,0.0 }};
+		float x_min = (-0.03f * label_text.length());
+		float x_max = (0.03f * label_text.length());
+		std::array< float, 16 > vertex_array = {{ x_min,-0.1f,0.0f,0.0f,
+												x_min,0.1f,0.0f,1.0f,
+												x_max,0.1f,1.0f,1.0f,
+												x_max,-0.1f,1.0f,0.0f }};
 		uint offset = num_labels * 4;
 		std::array< GLuint, 6 > index_array = {{ offset+0,offset+1,offset+2,offset+2,offset+0,offset+3 }};
 
@@ -1162,16 +1289,16 @@ struct TextLabels
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(prgm_handle,"fontAtlas_tx2D"),1,&zero);
 
+		// set label independent uniforms
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
 		glBindVertexArray(va_handle);
 
 		for(size_t i=0; i<visibility.size(); i++)
 		{
 			if(visibility[i])
 			{
-				// set uniforms
-				glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
-				glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
-
 				glUniform2fv(glGetUniformLocation(prgm_handle,"label_geoCoords"),1,&geoCoordinates[i*2]);
 				float charCount = (float)lengths[i];
 				glUniform1fv(glGetUniformLocation(prgm_handle,"label_charCount"),1,&charCount);
@@ -1187,9 +1314,193 @@ struct TextLabels
 			}
 		}
 	}
-
-
 };
+
+/**
+ * Collection of polygons on the map.
+ */
+struct Polygons
+{
+	Polygons()
+	{
+		// Load polygon shader program
+		prgm_handle = createShaderProgram("../src/polygon_v.glsl","../src/polygon_f.glsl",{"v_position"});
+
+		index_offsets.push_back(0);
+	}
+
+	Polygons(const Polygons& cpy) = delete;
+
+	/**
+	 * Adds a new polygon on the map froma set of nodes defining the boundary of the polygon.
+	 * Nodes have to be given in counter-clockwise order! Furthermore, the polygon musn't cross the +180°/-180° longitude border.
+	 * \param poly_border A set of nodes in geo coordinates defining the polygon boundary (counter-clockwise order required).
+	 */
+	void addPolygon(std::vector<Node> poly_border)
+	{
+		std::vector<Math::Vec2> triangulation_vertices;
+		std::vector<uint> triangulation_indices;
+
+		for(auto& node : poly_border)
+		{
+			vertices.push_back(node.lon);
+			vertices.push_back(node.lat);
+			triangulation_vertices.push_back(Math::Vec2(node.lon,node.lat));
+		}
+
+		triangulation_indices = computeTriangulation(triangulation_vertices);
+
+		for(auto& index : triangulation_indices)
+		{
+			indices.push_back(index);
+		}
+
+		index_offsets.push_back(triangulation_indices.size()+index_offsets.back());
+
+
+		if(vertices.size() < 1 || indices.size() < 1)
+			return;
+
+		auto va_size = sizeof(float) * 2 * vertices.size();
+		auto vi_size = sizeof(uint) * indices.size();
+
+		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &va_handle);
+			glGenBuffers(1, &vbo_handle);
+			glGenBuffers(1, &ibo_handle);
+		}
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, vertices.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, indices.data(), GL_STATIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(GL_FLOAT)*2, 0);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	/**
+	 * Draw all polygons.
+	 */
+	void draw(OrbitalCamera& camera)
+	{
+		glUseProgram(prgm_handle);
+
+		// set label independent uniforms
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+		glBindVertexArray(va_handle);
+
+		for(size_t i=0; i< index_offsets.size()-1; i++)
+		{
+			glPointSize(10.0);
+			glDrawElements(GL_TRIANGLES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
+		}
+	}
+
+private:
+	// Vertices for all polygons
+	std::vector<float> vertices;
+
+	// Indices for alle polygons
+	std::vector<uint> indices;
+
+	std::vector<uint> index_offsets;
+
+	GLuint va_handle;
+
+	GLuint vbo_handle;
+
+	GLuint ibo_handle;
+
+	GLuint prgm_handle;
+
+	static bool PointsOnSameLineSide(Math::Vec2 p1, Math::Vec2 p2, Math::Vec2 a, Math::Vec2 b)
+	{
+		Math::Mat2x2 lrot({{0.0f,1.0f,-1.0f,0.0f}});
+		double ab1 = Math::dot( lrot*(b-a), p1-a);
+		double ab2 = Math::dot( lrot*(b-a), p2-a);
+		return ab1*ab2 >= 0.0;
+	}
+	static bool vec2InTriangle(Math::Vec2 v, Math::Vec2 pre, Math::Vec2 cur, Math::Vec2 nex)
+	{
+		return
+			PointsOnSameLineSide(v, pre, cur, nex) &&
+			PointsOnSameLineSide(v, cur, nex, pre) &&
+			PointsOnSameLineSide(v, nex, pre, cur);
+	}
+	static bool vec2LeftOfLine(Math::Vec2 v, Math::Vec2 a, Math::Vec2 b)
+	{
+		Math::Mat2x2 lrot({{0,1,-1,0}});
+		return Math::dot( lrot*(b-a), v-a) > 0.0;
+	}
+	std::vector<uint> computeTriangulation(std::vector<Math::Vec2>& polyvertices)
+	{
+		if(polyvertices.size() < 3)
+			throw(std::runtime_error(
+				std::string("can not triangulate polygon with less than 3 vertices")));
+	
+		std::vector<uint> triangles;
+		std::list<Math::Vec3> vertices;
+		for(uint i=0; i<polyvertices.size(); i++)
+			vertices.push_back(Math::Vec3(polyvertices[i].x, polyvertices[i].y, float(i)));
+	
+		while(vertices.size() >= 3)
+		{
+			Math::Vec3 pre = vertices.front();
+			Math::Vec2 pre2(pre.x, pre.y);
+			vertices.pop_front();
+			Math::Vec3 cur = vertices.front();
+			Math::Vec2 cur2(cur.x, cur.y);
+			vertices.pop_front();
+			Math::Vec3 nex = vertices.front();
+			Math::Vec2 nex2(nex.x, nex.y);
+			vertices.pop_front();
+			/* check if triangle is an ear */
+			if( vec2LeftOfLine(nex2, pre2, cur2) )
+			{
+				/* check if triangle pre->cur->nex->pre can be cut */
+				bool vint = false;
+				for(auto& v : vertices)
+					if( vec2InTriangle(Math::Vec2(v.x,v.y), pre2, cur2, nex2) )
+						vint = true;
+				if(vint)
+				{
+					/* there is a vertex in the triangle, move to next triangle */
+					vertices.push_back(pre);
+					vertices.push_front(nex);
+					vertices.push_front(cur);
+				}
+				else
+				{ /* no vertex in triangle */
+					vertices.push_front(nex);
+					vertices.push_front(pre);
+					triangles.push_back(uint(pre.z));
+					triangles.push_back(uint(cur.z));
+					triangles.push_back(uint(nex.z));
+				}
+			}
+			else
+			{
+				vertices.push_back(pre);
+				vertices.push_front(nex);
+				vertices.push_front(cur);
+			}
+		}
+		return triangles;
+	}
+};
+
 
 struct DebugSphere
 {
@@ -1305,9 +1616,9 @@ namespace Controls {
 	{
 		OrbitalCamera* active_camera = reinterpret_cast<OrbitalCamera*>(glfwGetWindowUserPointer(window));
 
-		float camera_height_inertia = std::pow( (active_camera->orbit - 1.0f )*0.1f, 1.0);
+		float camera_height_inertia = std::pow( (active_camera->orbit - 1.0f )*0.1f, 1.0f);
 
-		active_camera->moveInOrbit(0.0,0.0,-camera_height_inertia * (float)y_offset);
+		active_camera->moveInOrbit(0.0f,0.0f,-camera_height_inertia * (float)y_offset);
 	}
 
 	void updateOrbitalCamera(GLFWwindow *window)
@@ -1325,7 +1636,7 @@ namespace Controls {
 			//camera_lon += cursor_movement.x;
 			//camera_lat -= cursor_movement.y;
 
-			GLfloat camera_vertical_inertia = std::pow( (active_camera->orbit - 1.0)*0.1, 1.2f);
+			GLfloat camera_vertical_inertia = std::pow( (active_camera->orbit - 1.0f)*0.1f, 1.2f);
 
 			active_camera->moveInOrbit(-cursor_movement[1]*camera_vertical_inertia,cursor_movement[0]*camera_vertical_inertia,0.0);
 		}
@@ -1533,6 +1844,10 @@ int main(int argc, char*argv[])
 		Graph lineGraph;
 		lineGraph.addSubgraph(nodes,edges);
 
+		/* Create polygons */
+		Polygons polys;
+		polys.addPolygon({Node(50.0,5.0),Node(43.0,3.2),Node(40.0,5.0),Node(40.0,10.0),Node(45.0,15.0),Node(50.0,10.0)});
+
 		/* Create a orbital camera */
 		OrbitalCamera camera;
 		camera.longitude = 0.0f;
@@ -1542,7 +1857,6 @@ int main(int argc, char*argv[])
 		camera.far = 10.0f;
 		camera.fovy = 30.0f * PI/180.0f;
 		camera.aspect_ratio = 16.0f/9.0f;
-
 
 		/* Make camera accessable in window callbacks */
 		glfwSetWindowUserPointer(window,&camera);
@@ -1555,10 +1869,10 @@ int main(int argc, char*argv[])
 		camera.updateProjectionMatrix();
 
 		for(int lon=-180; lon<=180 ; lon++)
-			labels.addLabel(std::to_string(lon),0.0,lon,0.25);
+			labels.addLabel(std::to_string(lon),0.0,(float)lon,0.25);
 
 		for(int lat=-90; lat<=90 ; lat++)
-			labels.addLabel(std::to_string(lat),lat,0.0,0.25);
+			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
@@ -1587,6 +1901,7 @@ int main(int argc, char*argv[])
 			glfwGetFramebufferSize(window, &width, &height);
 			glViewport(0, 0, width, height);
 
+			/* Draw debug sphere */
 			glUseProgram(debug_prgm_handle);
 
 			glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
@@ -1595,16 +1910,20 @@ int main(int argc, char*argv[])
 			glPointSize(2.0);
 			db_sphere.draw();
 
+			/* Draw polygons */
+			polys.draw(camera);
 
+			/* Draw edges (i.e. streets) */
 			glUseProgram(shader_prgm_handle);
 
 			glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
 			glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
 
-			float scale = std::min((0.0025/(camera.orbit - 1.0f)),2.0);
+			float scale = std::min((0.0025f/(camera.orbit - 1.0f)),2.0f);
 
 			lineGraph.draw( scale );
 
+			/* Draw labels */
 			labels.draw(camera);
 
 			GeoBoundingBox bbox = camera.computeVisibleArea();
