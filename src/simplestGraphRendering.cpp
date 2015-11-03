@@ -233,8 +233,7 @@ namespace Math
 struct Node
 {
 	Node() : lat(0), lon(0) {}
-	Node(double la, double lo) :
-	lat(la), lon(lo) {}
+	Node(double la, double lo) : lat(la), lon(lo) {}
 
 	double lat;
 	double lon;
@@ -246,8 +245,7 @@ struct Node
 struct Edge
 {
 	Edge() : source(0), target(0), width(0), color(0) {}
-	Edge(uint s, uint t, uint w, uint c) :
-	source(s), target(t), width(w), color(c) {}
+	Edge(uint s, uint t, uint w, uint c) : source(s), target(t), width(w), color(c) {}
 
 	uint source;
 	uint target;
@@ -255,7 +253,7 @@ struct Edge
 	int color;
 };
 
-/*
+/**
  * Each vertex contains the geo coordinates of a node and the color properties of adjacent edges.
  * Thus, for each node with adjacent egdes of different color multiple vertices are constructed.
  */
@@ -269,8 +267,8 @@ struct Vertex
 	float color;
 };
 
-/*
- * 
+/**
+ * A goe coordinate bounding box
  */
 struct GeoBoundingBox
 {
@@ -995,6 +993,16 @@ struct Subgraph
  */
 struct Graph
 {
+	Graph()
+	{
+		prgm_handle =  createShaderProgram("../src/edge_v.glsl","../src/edge_f.glsl",{"v_geoCoords","v_color"});
+	}
+	~Graph()
+	{
+		// delete shader program
+		glDeleteProgram(prgm_handle);
+	}
+
 	/**
 	 * Add a new subgraph. Defaults to layer 0.
 	 * \param nodes Set of nodes of the new subgraph.
@@ -1061,8 +1069,13 @@ struct Graph
 	 * The draw order depends on layers and -within each layer- on edge type.
 	 * \param scale Additonal scale factor for edge widths.
 	 */
-	void draw(float scale)
+	void draw(OrbitalCamera& camera,float scale)
 	{
+		glUseProgram(prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
 		for(auto& layer : layers)
 		{
 			for(auto& subgraph_idx : layer.second)
@@ -1075,6 +1088,11 @@ struct Graph
 
 private:
 	/**
+	 * OpenGL handle to graph rendering shader program
+	 */
+	GLuint prgm_handle;
+
+	/**
 	 * Actual (Linear) storage of all subgraphs.
 	 */
 	std::vector<std::unique_ptr<Subgraph>> subgraphs;
@@ -1086,7 +1104,7 @@ private:
 };
 
 /**
- * Collection of test labels on the map.
+ * Collection of text labels on the map.
  */
 struct TextLabels
 {
@@ -1504,31 +1522,12 @@ private:
 
 struct DebugSphere
 {
-	DebugSphere() : va_handle(0), vbo_handle(0), ibo_handle(0) {}
-	DebugSphere(const DebugSphere&) = delete;
-	~DebugSphere()
+	DebugSphere()
 	{
-		// delete mesh resources
-		glBindVertexArray(va_handle);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-		glDeleteBuffers(1, &ibo_handle);
-		glBindBuffer(GL_ARRAY_BUFFER,0);
-		glDeleteBuffers(1, &vbo_handle);
-		glBindVertexArray(0);
-		glDeleteVertexArrays(1, &va_handle);
-	}
+		// Load debug sphere shader program
+		prgm_handle = createShaderProgram("../src/debug_v.glsl","../src/debug_f.glsl",{"v_position"});
 
-	/* Handle for the vertex array object */
-	GLuint va_handle;
-
-	/* Handle for the vertex buffer object (allows access to vertex data in GPU memory) */
-	GLuint vbo_handle;
-
-	/* Handle for the index buffer objects (allows access to index data in GPU memory) */
-	GLuint ibo_handle;
-
-	void create()
-	{
+		// Create debug sphere geometry
 		std::vector<float> vertices;
 		std::vector<uint> indices;
 
@@ -1566,12 +1565,12 @@ struct DebugSphere
 		auto va_size = sizeof(float) * vertices.size();
 		auto vi_size = sizeof(uint) * indices.size();
 
-		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
-		{
+		//if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
+		//{
 			glGenVertexArrays(1, &va_handle);
 			glGenBuffers(1, &vbo_handle);
 			glGenBuffers(1, &ibo_handle);
-		}
+		//}
 
 		glBindVertexArray(va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
@@ -1589,13 +1588,48 @@ struct DebugSphere
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
-
-	void draw()
+	DebugSphere(const DebugSphere&) = delete;
+	~DebugSphere()
 	{
+		// delete shader program
+		glDeleteProgram(prgm_handle);
+
+		// delete mesh resources
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glDeleteBuffers(1, &ibo_handle);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glDeleteBuffers(1, &vbo_handle);
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &va_handle);
+	}
+
+	/** Handle for the vertex array object */
+	GLuint va_handle;
+
+	/** Handle for the vertex buffer object (allows access to vertex data in GPU memory) */
+	GLuint vbo_handle;
+
+	/** Handle for the index buffer objects (allows access to index data in GPU memory) */
+	GLuint ibo_handle;
+
+	/** Handle for the OpenGL program object */
+	GLuint prgm_handle;
+
+	void draw(OrbitalCamera& camera)
+	{
+		glUseProgram(prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+		glPointSize(2.0);
+
 		glBindVertexArray(va_handle);
 		glDrawElements(GL_POINTS,  5000,  GL_UNSIGNED_INT,  NULL );
 	}
 };
+
 
 void windowSizeCallback(GLFWwindow *window, int width, int height)
 {
@@ -1835,7 +1869,6 @@ int main(int argc, char*argv[])
 	{
 		/* Create GLSL programs */
 		GLuint shader_prgm_handle = createShaderProgram("../src/edge_v.glsl","../src/edge_f.glsl",{"v_geoCoords","v_color"});
-		GLuint debug_prgm_handle = createShaderProgram("../src/debug_v.glsl","../src/debug_f.glsl",{"v_position"});
 
 		//GLenum glerror = glGetError();
 		//std::cout<<glerror<<std::endl;
@@ -1876,7 +1909,6 @@ int main(int argc, char*argv[])
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
-		db_sphere.create();
 
 
 		//////////////////////////////////////////////////////
@@ -1902,26 +1934,14 @@ int main(int argc, char*argv[])
 			glViewport(0, 0, width, height);
 
 			/* Draw debug sphere */
-			glUseProgram(debug_prgm_handle);
-
-			glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
-			glUniformMatrix4fv(glGetUniformLocation(debug_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
-
-			glPointSize(2.0);
-			db_sphere.draw();
+			db_sphere.draw(camera);
 
 			/* Draw polygons */
 			polys.draw(camera);
 
 			/* Draw edges (i.e. streets) */
-			glUseProgram(shader_prgm_handle);
-
-			glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
-			glUniformMatrix4fv(glGetUniformLocation(shader_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
-
 			float scale = std::min((0.0025f/(camera.orbit - 1.0f)),2.0f);
-
-			lineGraph.draw( scale );
+			lineGraph.draw( camera, scale );
 
 			/* Draw labels */
 			labels.draw(camera);
@@ -1943,7 +1963,6 @@ int main(int argc, char*argv[])
 
 		// delete/free graphics resources
 		glDeleteProgram(shader_prgm_handle);
-		glDeleteProgram(debug_prgm_handle);
 	}
 
     glfwTerminate();
