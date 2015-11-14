@@ -1310,7 +1310,7 @@ struct TextLabels
 				int one = 1;
 				glUniform1iv(glGetUniformLocation(prgm_handle,"label_text_tx2D"),1,&one);
 
-				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*) offsets[i]);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*) &offsets[i]);
 			}
 		}
 	}
