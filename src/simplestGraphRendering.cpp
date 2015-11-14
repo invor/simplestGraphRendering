@@ -1427,7 +1427,7 @@ private:
 
 	static bool PointsOnSameLineSide(Math::Vec2 p1, Math::Vec2 p2, Math::Vec2 a, Math::Vec2 b)
 	{
-		Math::Mat2x2 lrot({{0.0f,1.0f,-1.0f,0.0f}});
+		Math::Mat2x2 lrot({0.0f,1.0f,-1.0f,0.0f});
 		double ab1 = Math::dot( lrot*(b-a), p1-a);
 		double ab2 = Math::dot( lrot*(b-a), p2-a);
 		return ab1*ab2 >= 0.0;
@@ -1441,7 +1441,7 @@ private:
 	}
 	static bool vec2LeftOfLine(Math::Vec2 v, Math::Vec2 a, Math::Vec2 b)
 	{
-		Math::Mat2x2 lrot({{0,1,-1,0}});
+		Math::Mat2x2 lrot({0,1,-1,0});
 		return Math::dot( lrot*(b-a), v-a) > 0.0;
 	}
 	std::vector<uint> computeTriangulation(std::vector<Math::Vec2>& polyvertices)
