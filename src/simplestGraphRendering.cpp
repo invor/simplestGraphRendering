@@ -1113,26 +1113,28 @@ struct TextLabels
 
 	TextLabels()
 	{
-		std::vector<std::string> atlas_rows;
+		std::vector<std::basic_string<wchar_t>> atlas_rows;
 
-		atlas_rows.push_back("ABCDEFGHIJKLMN");
-		atlas_rows.push_back("OPQRSTUVWXYZab");
-		atlas_rows.push_back("cdefghijklmnop");
-		atlas_rows.push_back("qrstuvwxyz1234");
-		atlas_rows.push_back("567890&@.,?!'\"");
-		atlas_rows.push_back("\"()*ßöäü-_");
+		atlas_rows.push_back( L"ABCDEFGHIJKLMN");
+		atlas_rows.push_back( L"OPQRSTUVWXYZab");
+		atlas_rows.push_back( L"cdefghijklmnop");
+		atlas_rows.push_back( L"qrstuvwxyz1234");
+		atlas_rows.push_back( L"567890&@.,?!'\"");
+		atlas_rows.push_back( L"\"()*-_ßöäü");
 
 
 		float u_value = 1.0f/16.0f;
 		float v_value = 5.0f/6.0f;
 
-		for(std::string& s : atlas_rows)
+		for(auto& s : atlas_rows)
 		{
-			for(unsigned char c : s)
+			for(auto c : s)
 			{
 				u[c] = u_value;
 				u_value += 1.0f/16.0f;
 				v[c] = v_value;
+
+				std::cout<<"Char: "<<c<<" Code: "<<(int)c<<" u: "<<u[c]<<" v: "<<v[c]<<std::endl;
 			}
 
 			u_value = 1.0f/16.0f;
@@ -1234,7 +1236,7 @@ struct TextLabels
 	std::vector<float> scales;
 	/** Visibility of each label i.e. rendered or not */
 	std::vector<bool> visibility;
-	/** Index array offset to beginning of label */
+	/** Index array offset to beginning of a label (given in byte) */
 	std::vector<uint> offsets;
 
 	void addLabel(std::string label_text, float latitude, float longitude, float scale)
@@ -1271,10 +1273,21 @@ struct TextLabels
 
 		// convert string to text texture (i.e. character to uv position in texture atlas)
 		float* data = new float[label_text.length()*2];
-		for(size_t i=0; i<label_text.length(); i++)
+		//	for(size_t i=0; i<label_text.length(); i++)
+		//	{
+		//		std::cout<<"Char: "<<label_text[i]<<" Code: "<<(uint)label_text[i]<<" u: "<<u[(int)label_text[i]]<<" v: "<<v[(int)label_text[i]]<<std::endl;
+		//	
+		//		data[i*2] = u[label_text[i]];
+		//		data[i*2 + 1] = v[label_text[i]];
+		//	}
+
+		uint i = 0;
+		for(auto& c : label_text)
 		{
-			data[i*2] = u[(int)label_text[i]];
-			data[i*2 + 1] = v[(int)label_text[i]];
+			std::cout<<"Char: "<<c<<" Code: "<<(int)c<<" u: "<<u[c]<<" v: "<<v[c]<<std::endl;
+
+			data[i++] = u[c];
+			data[i++] = v[c];
 		}
 
 		GLuint texture_handle = 0;
@@ -1328,7 +1341,7 @@ struct TextLabels
 				int one = 1;
 				glUniform1iv(glGetUniformLocation(prgm_handle,"label_text_tx2D"),1,&one);
 
-				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*) offsets[i]);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*) offsets[i] );
 			}
 		}
 	}
@@ -1343,6 +1356,23 @@ struct Polygons
 	{
 		// Load polygon shader program
 		prgm_handle = createShaderProgram("../src/polygon_v.glsl","../src/polygon_f.glsl",{"v_position"});
+
+		// Load font atlas
+		unsigned long begin_pos;
+		int x_dim, y_dim;
+		char* img_data;
+		ResourceLoader::readPpmHeader("../resources/background.ppm", begin_pos, x_dim, y_dim);
+		img_data = new char[x_dim * y_dim * 3];
+		ResourceLoader::readPpmData("../resources/background.ppm", img_data, begin_pos, x_dim, y_dim);
+
+		glGenTextures(1, &background_tx_handle);
+		glBindTexture(GL_TEXTURE_2D, background_tx_handle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x_dim, y_dim, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data);
+		glBindTexture(GL_TEXTURE_2D,0);
 
 		index_offsets.push_back(0);
 	}
@@ -1413,6 +1443,11 @@ struct Polygons
 	{
 		glUseProgram(prgm_handle);
 
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D,background_tx_handle);
+		int zero = 0;
+		glUniform1iv(glGetUniformLocation(prgm_handle,"background_tx2D"),1,&zero);
+
 		// set label independent uniforms
 		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
 		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
@@ -1442,6 +1477,8 @@ private:
 	GLuint ibo_handle;
 
 	GLuint prgm_handle;
+
+	GLuint background_tx_handle;
 
 	static bool PointsOnSameLineSide(Math::Vec2 p1, Math::Vec2 p2, Math::Vec2 a, Math::Vec2 b)
 	{
@@ -1867,9 +1904,6 @@ int main(int argc, char*argv[])
 	 * scope, so that they are destroyed while the OpenGL context is still alive
 	 */	
 	{
-		/* Create GLSL programs */
-		GLuint shader_prgm_handle = createShaderProgram("../src/edge_v.glsl","../src/edge_f.glsl",{"v_geoCoords","v_color"});
-
 		//GLenum glerror = glGetError();
 		//std::cout<<glerror<<std::endl;
 
@@ -1906,6 +1940,8 @@ int main(int argc, char*argv[])
 
 		for(int lat=-90; lat<=90 ; lat++)
 			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
+
+		labels.addLabel("\"()*ßöäü-_",48.0,5.0,0.25);
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
@@ -1959,10 +1995,6 @@ int main(int argc, char*argv[])
 		    /* Poll for and process events */
 		    glfwPollEvents();
 		}
-
-
-		// delete/free graphics resources
-		glDeleteProgram(shader_prgm_handle);
 	}
 
     glfwTerminate();

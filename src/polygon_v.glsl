@@ -7,6 +7,7 @@ uniform mat4 projection_matrix;
 
 in vec2 v_geoCoords;
 
+out vec2 geoCoords;
 
 void main()
 {
@@ -21,6 +22,8 @@ void main()
 	vec3 world_position = vec3( lon_sin * lat_cos * r,
 								lat_sin * r,
 								lat_cos * lon_cos * r );
+								
+	geoCoords = v_geoCoords;
 								
 	gl_Position = projection_matrix * view_matrix * vec4(world_position,1.0);
 }
