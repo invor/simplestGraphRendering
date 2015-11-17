@@ -1217,7 +1217,7 @@ struct TextLabels
 	/** Visibility of each label i.e. rendered or not */
 	std::vector<bool> visibility;
 	/** Index array offset to beginning of label */
-	std::vector<ptrdiff_t> offsets;
+	std::vector<size_t> offsets;
 
 	void addLabel(std::string label_text, float latitude, float longitude, float scale)
 	{
