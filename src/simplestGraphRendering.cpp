@@ -842,7 +842,6 @@ struct Subgraph
 	void loadGraphData(std::vector<Node>& nodes, std::vector<Edge>& edges)
 	{
 		index_offsets.clear();
-		index_offsets.push_back(0);
 		line_widths.clear();
 
 		std::vector<Vertex> vertices;
