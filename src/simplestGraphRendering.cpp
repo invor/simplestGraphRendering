@@ -5,7 +5,11 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
+
 #include <string>
+#include <locale>
+#include <codecvt>
+
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
@@ -1113,20 +1117,30 @@ struct TextLabels
 
 	TextLabels()
 	{
-		std::vector<std::basic_string<wchar_t>> atlas_rows;
+		//	std::vector<std::basic_string<wchar_t>> atlas_rows;
+		//	
+		//	atlas_rows.push_back( L"ABCDEFGHIJKLMN");
+		//	atlas_rows.push_back( L"OPQRSTUVWXYZab");
+		//	atlas_rows.push_back( L"cdefghijklmnop");
+		//	atlas_rows.push_back( L"qrstuvwxyz1234");
+		//	atlas_rows.push_back( L"567890&@.,?!'\"");
+		//	atlas_rows.push_back( L"\"()*-_ßöäü");
 
-		atlas_rows.push_back( L"ABCDEFGHIJKLMN");
-		atlas_rows.push_back( L"OPQRSTUVWXYZab");
-		atlas_rows.push_back( L"cdefghijklmnop");
-		atlas_rows.push_back( L"qrstuvwxyz1234");
-		atlas_rows.push_back( L"567890&@.,?!'\"");
-		atlas_rows.push_back( L"\"()*-_ßöäü");
+		// Using u16string, hoping to gain support for umlauts
+		std::vector<std::u16string> u16_atlas_rows;
+		std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf16conv;
 
+		u16_atlas_rows.push_back(utf16conv.from_bytes( "ABCDEFGHIJKLMN" ));
+		u16_atlas_rows.push_back(utf16conv.from_bytes( "OPQRSTUVWXYZab" ));
+		u16_atlas_rows.push_back(utf16conv.from_bytes( "cdefghijklmnop" ));
+		u16_atlas_rows.push_back(utf16conv.from_bytes( "qrstuvwxyz1234" ));
+		u16_atlas_rows.push_back(utf16conv.from_bytes( "567890&@.,?!'\"" ));
+		u16_atlas_rows.push_back(utf16conv.from_bytes( "\"()*-_ßöäüÖÄÜ" ));
 
 		float u_value = 1.0f/16.0f;
 		float v_value = 5.0f/6.0f;
 
-		for(auto& s : atlas_rows)
+		for(auto& s : u16_atlas_rows)
 		{
 			for(auto c : s)
 			{
@@ -1134,7 +1148,7 @@ struct TextLabels
 				u_value += 1.0f/16.0f;
 				v[c] = v_value;
 
-				std::cout<<"Char: "<<c<<" Code: "<<(int)c<<" u: "<<u[c]<<" v: "<<v[c]<<std::endl;
+				//std::cout<<"Char: "<< (char16_t) c<<" Code: "<<(int)c<<" u: "<<u[c]<<" v: "<<v[c]<<std::endl;
 			}
 
 			u_value = 1.0f/16.0f;
@@ -1224,7 +1238,7 @@ struct TextLabels
 	GLuint font_atlas_handle;
 
 	/** Total number of labels */
-	uint num_labels;
+	uint num_labels = 0;
 
 	/** Geo-Cooridnates of each label */
 	std::vector<float> geoCoordinates;
@@ -1281,10 +1295,13 @@ struct TextLabels
 		//		data[i*2 + 1] = v[label_text[i]];
 		//	}
 
+		std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf16conv;
+		std::u16string u16_label_text = utf16conv.from_bytes(label_text);
+
 		uint i = 0;
-		for(auto& c : label_text)
+		for(auto& c : u16_label_text)
 		{
-			std::cout<<"Char: "<<c<<" Code: "<<(int)c<<" u: "<<u[c]<<" v: "<<v[c]<<std::endl;
+			//std::cout<<"Char: "<<c<<" Code: "<<(int)c<<" u: "<<u[c]<<" v: "<<v[c]<<std::endl;
 
 			data[i++] = u[c];
 			data[i++] = v[c];
@@ -1941,7 +1958,7 @@ int main(int argc, char*argv[])
 		for(int lat=-90; lat<=90 ; lat++)
 			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
 
-		labels.addLabel("\"()*ßöäü-_",48.0,5.0,0.25);
+		labels.addLabel("\"()*-_ßöäüÜÖÄ",48.0,5.0,0.25);
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
