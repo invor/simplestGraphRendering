@@ -844,7 +844,6 @@ struct Subgraph
 	void loadGraphData(std::vector<Node>& nodes, std::vector<Edge>& edges)
 	{
 		index_offsets.clear();
-		index_offsets.push_back(0);
 		line_widths.clear();
 
 		std::vector<Vertex> vertices;
@@ -1250,8 +1249,8 @@ struct TextLabels
 	std::vector<float> scales;
 	/** Visibility of each label i.e. rendered or not */
 	std::vector<bool> visibility;
-	/** Index array offset to beginning of a label (given in byte) */
-	std::vector<uint> offsets;
+	/** Index array offset to beginning of label */
+	std::vector<size_t> offsets;
 
 	void addLabel(std::string label_text, float latitude, float longitude, float scale)
 	{
@@ -1499,7 +1498,7 @@ private:
 
 	static bool PointsOnSameLineSide(Math::Vec2 p1, Math::Vec2 p2, Math::Vec2 a, Math::Vec2 b)
 	{
-		Math::Mat2x2 lrot({{0.0f,1.0f,-1.0f,0.0f}});
+		Math::Mat2x2 lrot({0.0f,1.0f,-1.0f,0.0f});
 		double ab1 = Math::dot( lrot*(b-a), p1-a);
 		double ab2 = Math::dot( lrot*(b-a), p2-a);
 		return ab1*ab2 >= 0.0;
@@ -1513,7 +1512,7 @@ private:
 	}
 	static bool vec2LeftOfLine(Math::Vec2 v, Math::Vec2 a, Math::Vec2 b)
 	{
-		Math::Mat2x2 lrot({{0,1,-1,0}});
+		Math::Mat2x2 lrot({0,1,-1,0});
 		return Math::dot( lrot*(b-a), v-a) > 0.0;
 	}
 	std::vector<uint> computeTriangulation(std::vector<Math::Vec2>& polyvertices)
