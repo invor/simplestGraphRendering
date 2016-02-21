@@ -1151,7 +1151,7 @@ struct SimpleGraph
 {
 	SimpleGraph()
 	{
-		prgm_handle = createShaderProgram("../src/simpleGraph_v.glsl","../src/simpleGraph_f.glsl",{"v_geoCoords","v_color"});
+		prgm_handle = createShaderProgram("../src/simpleGraph_v.glsl","../src/simpleGraph_f.glsl",{"v_geoCoords","v_colour"});
 	}
 	SimpleGraph(const SimpleGraph&) = delete;
 
