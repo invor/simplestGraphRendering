@@ -271,6 +271,46 @@ struct Vertex
 	float color;
 };
 
+struct Node_RGB
+{
+	Node_RGB() : lat(0), lon(0) {}
+	Node_RGB(double la, double lo) : lat(la), lon(lo) {}
+
+	double lat;
+	double lon;
+
+	char r;
+	char b;
+	char g;
+};
+
+struct Edge_RGB
+{
+	Edge_RGB() : source(0), target(0), width(0), r(0), g(0), b(0) {}
+	Edge_RGB(uint s, uint t, uint w, char r, char g, char b)
+		: source(s), target(t), width(w), r(r), g(g), b(b) {}
+
+	uint source;
+	uint target;
+	uint width;
+	char r;
+	char g;
+	char b;
+};
+
+struct Vertex_RGB
+{
+	Vertex_RGB() : longitude(0.0), latitude(0.0), r(0), g(0), b(0) {}
+	Vertex_RGB(float lon, float lat, char r, char g, char b)
+		: longitude(lon), latitude(lat), r(r), g(g), b(b) {}
+
+	float longitude;
+	float latitude;
+	char r;
+	char g;
+	char b;
+};
+
 /**
  * A goe coordinate bounding box
  */
@@ -1106,6 +1146,162 @@ private:
 	std::map<uint,std::list<uint>> layers;
 };
 
+struct SimpleGraph
+{
+	SimpleGraph()
+	{
+		prgm_handle = createShaderProgram("../src/simpleGraph_v.glsl","../src/simpleGraph_f.glsl",{"v_geoCoords","v_color"});
+	}
+	SimpleGraph(const SimpleGraph&) = delete;
+
+	GLuint prgm_handle;
+
+	uint num_nodes;
+
+	GLuint node_va_handle;
+
+	GLuint node_vbo_handle;
+
+	GLuint node_ibo_handle;
+
+	uint num_edges;
+
+	GLuint edge_va_handle;
+
+	GLuint edge_vbo_handle;
+
+	GLuint edge_ibo_handle;
+
+	void loadGraphData(std::vector<Node_RGB>& nodes, std::vector<Edge_RGB>& edges)
+	{
+		num_nodes = nodes.size();
+		num_edges = edges.size();
+
+		std::vector<Vertex_RGB> node_vertices;
+		std::vector<uint> node_indices;
+
+		// At least as many vertices as there are nodes are required
+		node_vertices.reserve(nodes.size());
+	
+		// Each edge contributes two indices
+		node_indices.reserve(nodes.size());
+
+		// Copy geo coordinates from input nodes to vertices
+		uint index_counter = 0;
+		for(auto& node : nodes)
+		{
+			node_vertices.push_back(Vertex_RGB((float)node.lon,(float)node.lat, node.r, node.g, node.b));
+
+			node_indices.push_back(index_counter++);
+		}
+
+
+		//TODO create geometry for edges
+
+		std::vector<Vertex_RGB> edge_vertices;
+		std::vector<uint> edge_indices;
+
+		// At least as many vertices as there are nodes are required
+		edge_vertices.reserve(nodes.size());
+	
+		// Each edge contributes two indices
+		edge_indices.reserve(edges.size()*2);
+
+		index_counter = 0;
+		for(auto& edge : edges)
+		{
+			edge_vertices.push_back(Vertex_RGB(nodes[edge.source].lon,nodes[edge.source].lat,edge.r,edge.g,edge.b));
+			edge_vertices.push_back(Vertex_RGB(nodes[edge.target].lon,nodes[edge.target].lat,edge.r,edge.g,edge.b));
+
+			edge_indices.push_back(index_counter++);
+			edge_indices.push_back(index_counter++);
+
+			//TODO could be possible to optimize by findign vertices of the same color
+		}
+
+
+		// Allocate GPU memory and send data
+		if(node_vertices.size() < 1 || node_indices.size() < 1)
+			return;
+
+		auto va_size = sizeof(Vertex_RGB) * node_vertices.size();
+		auto vi_size = sizeof(uint) * node_indices.size();
+
+		if(node_va_handle == 0 || node_vbo_handle == 0 || node_ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &node_va_handle);
+			glGenBuffers(1, &node_vbo_handle);
+			glGenBuffers(1, &node_ibo_handle);
+		}
+
+		glBindVertexArray(node_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, node_vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, node_vertices.data(), GL_DYNAMIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, node_ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, node_indices.data(), GL_DYNAMIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(node_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, node_vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_RGB), 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+
+		if(edge_vertices.size() < 1 || edge_indices.size() < 1)
+			return;
+
+		va_size = sizeof(Vertex_RGB) * edge_vertices.size();
+		vi_size = sizeof(uint) * edge_indices.size();
+
+		if(edge_va_handle == 0 || edge_vbo_handle == 0 || edge_ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &edge_va_handle);
+			glGenBuffers(1, &edge_vbo_handle);
+			glGenBuffers(1, &edge_ibo_handle);
+		}
+
+		glBindVertexArray(edge_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, edge_vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, edge_vertices.data(), GL_DYNAMIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, edge_ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, edge_indices.data(), GL_DYNAMIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(edge_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, edge_vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_RGB), 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+
+	void draw(OrbitalCamera& camera,float scale)
+	{
+		glUseProgram(prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+		glLineWidth(std::max(1.0f,20.0f * scale));
+		glBindVertexArray(edge_va_handle);
+		glDrawElements(GL_LINES,  num_edges*2,  GL_UNSIGNED_INT,  (void*)(0) );
+
+		glPointSize(std::max(2.0f,15.0f * scale));
+		glBindVertexArray(node_va_handle);
+		glDrawElements(GL_POINTS,  num_nodes,  GL_UNSIGNED_INT,  (void*)(0) );
+	}
+};
+
 /**
  * Collection of text labels on the map.
  */
@@ -1756,7 +1952,7 @@ namespace Parser
 	}
 
 	/**
-	 * createEdge - erstellt eine neue Kante
+	 * createEdge - create a new edge
 	 * @param input_string Input string containing edge data
 	 * @param r_edge Edge created from input string
 	 */
@@ -1821,6 +2017,87 @@ namespace Parser
 
 		return false;
 	}
+
+
+	void createNodeRGB(std::string input_string, Node_RGB& r_node)
+	{
+		std::stringstream ss(input_string);
+		std::string buffer;
+
+		ss >> buffer;
+		r_node.lat = atof(buffer.c_str());
+
+		ss >> buffer;
+		r_node.lon = atof(buffer.c_str());
+
+		ss >> buffer;
+		r_node.r = (char)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_node.g = (char)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_node.b = (char)atoi(buffer.c_str());
+	}
+
+	void createEdgeRGB(std::string input_string, Edge_RGB& r_edge)
+	{
+		std::stringstream ss(input_string);
+		std::string buffer;
+
+		ss >> buffer;
+		r_edge.source = (uint)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.target = (uint)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.r = (char)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.g = (char)atoi(buffer.c_str());
+
+		ss >> buffer;
+		r_edge.b = (char)atoi(buffer.c_str());
+	}
+
+	bool parseTxtSimpleGraphFile(std::string graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e)
+	{
+		std::string buffer;
+		std::ifstream file;
+
+		file.open(graphfile.c_str(), std::ios::in);
+
+		if( file.is_open())
+		{
+			file.seekg(0, std::ios::beg);
+			getline(file,buffer,'\n');
+			uint node_count = (uint)atoi(buffer.c_str());
+			getline(file,buffer,'\n');
+			uint edge_count = (uint)atoi(buffer.c_str());
+
+			n.reserve(node_count);
+			for(uint i=0; i<node_count; i++)
+			{
+				getline(file,buffer,'\n');
+				n.push_back(Node_RGB());
+				createNodeRGB(buffer, n.back() );
+			}
+
+			e.reserve(edge_count);
+			for(uint j=0; j<edge_count; j++)
+			{
+				getline(file,buffer,'\n');
+				e.push_back(Edge_RGB());
+				createEdgeRGB(buffer, e.back() );
+			}
+			file.close();
+
+			return true;
+		}
+
+		return false;
+	}
 }
 
 int main(int argc, char*argv[])
@@ -1833,7 +2110,7 @@ int main(int argc, char*argv[])
 
 	int i=1;
     if (argc < 3) {
-		std::cout<<"Supply a graph with -gf <graph.gl>"<<std::endl; return 0;
+		std::cout<<"Supply a graph with -gf <graph.gl> or -gf <graph.sg>"<<std::endl; return 0;
 	}
 	while(i<argc)
 	{
@@ -1904,8 +2181,26 @@ int main(int argc, char*argv[])
 	std::vector<Node> nodes;
 	std::vector<Edge> edges;
 
-	Parser::parseTxtGraphFile(filepath,nodes,edges);
+	std::vector<Node_RGB> nodes_rgb;
+	std::vector<Edge_RGB> edges_rgb;
 
+	/* Decide which graph format to load */
+	bool gl = false;
+	bool sg = false;
+	size_t filepath_length = filepath.length();
+	char buffer[2];
+	filepath.copy(buffer,filepath_length-1,filepath_length-2);
+	std::string file_format(buffer);
+
+	if( std::strcmp(file_format.c_str(),"gl") == 0 )
+		gl = true;
+	else if( std::strcmp(file_format.c_str(),"sg") == 0 )
+		sg = true;
+
+	if(gl)
+		Parser::parseTxtGraphFile(filepath,nodes,edges);
+	else if(sg)
+		Parser::parseTxtSimpleGraphFile(filepath,nodes_rgb,edges_rgb);
 
 	/////////////////////////////////////////////////////////////////////
 	// Creation of graphics resources, i.e. shader programs, meshes, etc.
@@ -1925,7 +2220,13 @@ int main(int argc, char*argv[])
 
 		/* Create renderable graph (mesh) */
 		Graph lineGraph;
-		lineGraph.addSubgraph(nodes,edges);
+		if(gl)
+			lineGraph.addSubgraph(nodes,edges);
+
+		/* Create renderable simple graph (mesh) */
+		SimpleGraph simpleColouredGraph;
+		if(sg)
+			simpleColouredGraph.loadGraphData(nodes_rgb,edges_rgb);
 
 		/* Create polygons */
 		Polygons polys;
@@ -1993,7 +2294,12 @@ int main(int argc, char*argv[])
 
 			/* Draw edges (i.e. streets) */
 			float scale = std::min((0.0025f/(camera.orbit - 1.0f)),2.0f);
-			lineGraph.draw( camera, scale );
+
+			if(gl)
+				lineGraph.draw( camera, scale );
+			else if(sg)
+				simpleColouredGraph.draw( camera, scale );
+
 
 			/* Draw labels */
 			labels.draw(camera);
