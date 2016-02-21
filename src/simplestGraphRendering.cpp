@@ -9,6 +9,7 @@
 #include <string>
 #include <locale>
 #include <codecvt>
+#include <cstring>
 
 #include <algorithm>
 #include <iostream>
