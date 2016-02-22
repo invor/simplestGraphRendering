@@ -1937,7 +1937,7 @@ namespace Parser
 	/**
 	 * Creates a new graph node
 	 * @param input_string Input string containing node data
-	 * @param r_node Node created from input string
+	 * @param n Nodes vector to put the new node into.
 	 */
 	void createNode(std::string input_string, std::vector<Node>& n)
 	{
@@ -1952,7 +1952,7 @@ namespace Parser
 	/**
 	 * createEdge - create a new edge
 	 * @param input_string Input string containing edge data
-	 * @param r_edge Edge created from input string
+	 * @param e Edges vector to put the new edge into.
 	 */
 	void createEdge(std::string input_string, std::vector<Edge>& e)
 	{
