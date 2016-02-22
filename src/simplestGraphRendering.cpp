@@ -1149,14 +1149,45 @@ private:
 struct SimpleGraph
 {
 	SimpleGraph()
+		: prgm_handle(0), num_nodes(0), node_va_handle(0), node_vbo_handle(0), node_ibo_handle(0),
+		num_edges(0), edge_va_handle(0), edge_vbo_handle(0), edge_ibo_handle(0)
 	{
 		prgm_handle = createShaderProgram("../src/simpleGraph_v.glsl","../src/simpleGraph_f.glsl",{"v_geoCoords","v_colour"});
 	}
 	SimpleGraph(const SimpleGraph&) = delete;
+	~SimpleGraph()
+	{
+		if( node_va_handle != 0 )
+		{
+			// delete mesh resources
+			glBindVertexArray(node_va_handle);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+			glDeleteBuffers(1, &node_ibo_handle);
+			glBindBuffer(GL_ARRAY_BUFFER,0);
+			glDeleteBuffers(1, &node_vbo_handle);
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &node_va_handle);
+		}
+
+		if( edge_va_handle != 0 )
+		{
+			// delete mesh resources
+			glBindVertexArray(edge_va_handle);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+			glDeleteBuffers(1, &edge_ibo_handle);
+			glBindBuffer(GL_ARRAY_BUFFER,0);
+			glDeleteBuffers(1, &edge_vbo_handle);
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &edge_va_handle);
+		}
+
+		// delete shader program
+		glDeleteProgram(prgm_handle);
+	}
 
 	GLuint prgm_handle;
 
-	uint num_nodes;
+	size_t num_nodes;
 
 	GLuint node_va_handle;
 
@@ -1164,7 +1195,7 @@ struct SimpleGraph
 
 	GLuint node_ibo_handle;
 
-	uint num_edges;
+	size_t num_edges;
 
 	GLuint edge_va_handle;
 
@@ -1294,11 +1325,11 @@ struct SimpleGraph
 
 		glLineWidth(std::max(1.0f,20.0f * scale));
 		glBindVertexArray(edge_va_handle);
-		glDrawElements(GL_LINES,  num_edges*2,  GL_UNSIGNED_INT,  (void*)(0) );
+		glDrawElements(GL_LINES,  (GLsizei)num_edges * 2,  GL_UNSIGNED_INT,  (void*)(0) );
 
 		glPointSize(std::max(2.0f,15.0f * scale));
 		glBindVertexArray(node_va_handle);
-		glDrawElements(GL_POINTS,  num_nodes,  GL_UNSIGNED_INT,  (void*)(0) );
+		glDrawElements(GL_POINTS,  (GLsizei)num_nodes,  GL_UNSIGNED_INT,  (void*)(0) );
 	}
 };
 
