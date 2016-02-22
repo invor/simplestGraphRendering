@@ -1939,14 +1939,14 @@ namespace Parser
 	 * @param input_string Input string containing node data
 	 * @param n Nodes vector to put the new node into.
 	 */
-	void createNode(std::string input_string, std::vector<Node>& n)
+	void createNode(const std::string& input_string, std::vector<Node>& n)
 	{
-		double lat, lon;
+		std::string lat, lon;
 
 		std::stringstream ss(input_string);
 		ss >> lat >> lon;
 
-		n.emplace_back(lat, lon);
+		n.emplace_back(std::stof(lat), std::stof(lon));
 	}
 
 	/**
@@ -1954,15 +1954,14 @@ namespace Parser
 	 * @param input_string Input string containing edge data
 	 * @param e Edges vector to put the new edge into.
 	 */
-	void createEdge(std::string input_string, std::vector<Edge>& e)
+	void createEdge(const std::string& input_string, std::vector<Edge>& e)
 	{
-		uint source, target, width;
-		int color;
+		std::string source, target, width, color;
 
 		std::stringstream ss(input_string);
 		ss >> source >> target >> width >> color;
 
-		e.emplace_back(source, target, width, color);
+		e.emplace_back(std::stoul(source), std::stoul(target), std::stoul(width), std::stoi(color));
 	}
 
 	/**
@@ -1971,7 +1970,7 @@ namespace Parser
 	 * @param n Vector for storing the parsed nodes
 	 * @param e Vector for storing the parsed edges
 	 */
-	bool parseTxtGraphFile(std::string graphfile, std::vector<Node>& n, std::vector<Edge>& e)
+	bool parseTxtGraphFile(const std::string& graphfile, std::vector<Node>& n, std::vector<Edge>& e)
 	{
 		std::string buffer;
 		std::ifstream file;
@@ -2009,29 +2008,27 @@ namespace Parser
 	}
 
 
-	void createNodeRGB(std::string input_string, std::vector<Node_RGB>& n)
+	void createNodeRGB(const std::string& input_string, std::vector<Node_RGB>& n)
 	{
-		double lat, lon;
-		int r, g, b;
+		std::string lat, lon, r, g, b;
 
 		std::stringstream ss(input_string);
 		ss >> lat >> lon >> r >> g >> b;
 
-		n.emplace_back(lat, lon, r, g, b);
+		n.emplace_back(std::stof(lat), std::stof(lon), std::stoi(r), std::stoi(g), std::stoi(b));
 	}
 
-	void createEdgeRGB(std::string input_string, std::vector<Edge_RGB>& e)
+	void createEdgeRGB(const std::string& input_string, std::vector<Edge_RGB>& e)
 	{
-		uint source, target;
-		int r, g, b;
+		std::string source, target, r, g, b;
 
 		std::stringstream ss(input_string);
 		ss >> source >> target >> r >> g >> b;
 
-		e.emplace_back(source, target, r, g, b);
+		e.emplace_back(std::stoul(source), std::stoul(target), std::stoi(r), std::stoi(g), std::stoi(b));
 	}
 
-	bool parseTxtSimpleGraphFile(std::string graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e)
+	bool parseTxtSimpleGraphFile(const std::string& graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e)
 	{
 		std::string buffer;
 		std::ifstream file;
