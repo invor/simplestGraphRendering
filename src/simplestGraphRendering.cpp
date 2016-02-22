@@ -275,25 +275,24 @@ struct Vertex
 struct Node_RGB
 {
 	Node_RGB() : lat(0), lon(0) {}
-	Node_RGB(double la, double lo) : lat(la), lon(lo) {}
+	Node_RGB(double la, double lo, char r, char g, char b) : lat(la), lon(lo), r(r), g(g), b(b) {}
 
 	double lat;
 	double lon;
 
 	char r;
-	char b;
 	char g;
+	char b;
 };
 
 struct Edge_RGB
 {
-	Edge_RGB() : source(0), target(0), width(0), r(0), g(0), b(0) {}
-	Edge_RGB(uint s, uint t, uint w, char r, char g, char b)
-		: source(s), target(t), width(w), r(r), g(g), b(b) {}
+	Edge_RGB() : source(0), target(0), r(0), g(0), b(0) {}
+	Edge_RGB(uint s, uint t, char r, char g, char b)
+		: source(s), target(t), r(r), g(g), b(b) {}
 
 	uint source;
 	uint target;
-	uint width;
 	char r;
 	char g;
 	char b;
@@ -1940,16 +1939,14 @@ namespace Parser
 	 * @param input_string Input string containing node data
 	 * @param r_node Node created from input string
 	 */
-	void createNode(std::string input_string, Node& r_node)
+	void createNode(std::string input_string, std::vector<Node>& n)
 	{
+		double lat, lon;
+
 		std::stringstream ss(input_string);
-		std::string buffer;
+		ss >> lat >> lon;
 
-		ss >> buffer;
-		r_node.lat = atof(buffer.c_str());
-
-		ss >> buffer;
-		r_node.lon = atof(buffer.c_str());
+		n.emplace_back(lat, lon);
 	}
 
 	/**
@@ -1957,22 +1954,15 @@ namespace Parser
 	 * @param input_string Input string containing edge data
 	 * @param r_edge Edge created from input string
 	 */
-	void createEdge(std::string input_string, Edge& r_edge)
+	void createEdge(std::string input_string, std::vector<Edge>& e)
 	{
+		uint source, target, width;
+		int color;
+
 		std::stringstream ss(input_string);
-		std::string buffer;
+		ss >> source >> target >> width >> color;
 
-		ss >> buffer;
-		r_edge.source = (uint)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.target = (uint)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.width = (uint)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.color = (int)atoi(buffer.c_str());
+		e.emplace_back(source, target, width, color);
 	}
 
 	/**
@@ -1988,28 +1978,27 @@ namespace Parser
 
 		file.open(graphfile.c_str(), std::ios::in);
 
-		if( file.is_open())
+		if(file.is_open())
 		{
 			file.seekg(0, std::ios::beg);
+
 			getline(file,buffer,'\n');
-			uint node_count = (uint)atoi(buffer.c_str());
+			uint node_count = std::stoul(buffer);
 			getline(file,buffer,'\n');
-			uint edge_count = (uint)atoi(buffer.c_str());
+			uint edge_count = std::stoul(buffer);
 
 			n.reserve(node_count);
 			for(uint i=0; i<node_count; i++)
 			{
 				getline(file,buffer,'\n');
-				n.push_back(Node());
-				createNode(buffer, n.back() );
+				createNode(buffer, n);
 			}
 
 			e.reserve(edge_count);
 			for(uint j=0; j<edge_count; j++)
 			{
 				getline(file,buffer,'\n');
-				e.push_back(Edge());
-				createEdge(buffer, e.back() );
+				createEdge(buffer, e);
 			}
 			file.close();
 
@@ -2020,46 +2009,26 @@ namespace Parser
 	}
 
 
-	void createNodeRGB(std::string input_string, Node_RGB& r_node)
+	void createNodeRGB(std::string input_string, std::vector<Node_RGB>& n)
 	{
+		double lat, lon;
+		int r, g, b;
+
 		std::stringstream ss(input_string);
-		std::string buffer;
+		ss >> lat >> lon >> r >> g >> b;
 
-		ss >> buffer;
-		r_node.lat = atof(buffer.c_str());
-
-		ss >> buffer;
-		r_node.lon = atof(buffer.c_str());
-
-		ss >> buffer;
-		r_node.r = (char)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_node.g = (char)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_node.b = (char)atoi(buffer.c_str());
+		n.emplace_back(lat, lon, r, g, b);
 	}
 
-	void createEdgeRGB(std::string input_string, Edge_RGB& r_edge)
+	void createEdgeRGB(std::string input_string, std::vector<Edge_RGB>& e)
 	{
+		uint source, target;
+		int r, g, b;
+
 		std::stringstream ss(input_string);
-		std::string buffer;
+		ss >> source >> target >> r >> g >> b;
 
-		ss >> buffer;
-		r_edge.source = (uint)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.target = (uint)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.r = (char)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.g = (char)atoi(buffer.c_str());
-
-		ss >> buffer;
-		r_edge.b = (char)atoi(buffer.c_str());
+		e.emplace_back(source, target, r, g, b);
 	}
 
 	bool parseTxtSimpleGraphFile(std::string graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e)
@@ -2072,25 +2041,24 @@ namespace Parser
 		if( file.is_open())
 		{
 			file.seekg(0, std::ios::beg);
+
 			getline(file,buffer,'\n');
-			uint node_count = (uint)atoi(buffer.c_str());
+			uint node_count = std::stoul(buffer);
 			getline(file,buffer,'\n');
-			uint edge_count = (uint)atoi(buffer.c_str());
+			uint edge_count = std::stoul(buffer);
 
 			n.reserve(node_count);
 			for(uint i=0; i<node_count; i++)
 			{
 				getline(file,buffer,'\n');
-				n.push_back(Node_RGB());
-				createNodeRGB(buffer, n.back() );
+				createNodeRGB(buffer, n);
 			}
 
 			e.reserve(edge_count);
 			for(uint j=0; j<edge_count; j++)
 			{
 				getline(file,buffer,'\n');
-				e.push_back(Edge_RGB());
-				createEdgeRGB(buffer, e.back() );
+				createEdgeRGB(buffer, e);
 			}
 			file.close();
 
@@ -2189,13 +2157,11 @@ int main(int argc, char*argv[])
 	bool gl = false;
 	bool sg = false;
 	size_t filepath_length = filepath.length();
-	char buffer[2];
-	filepath.copy(buffer,filepath_length-1,filepath_length-2);
-	std::string file_format(buffer);
+	std::string file_format(filepath.substr(filepath_length-2, 2));
 
-	if( std::strcmp(file_format.c_str(),"gl") == 0 )
+	if(file_format == "gl")
 		gl = true;
-	else if( std::strcmp(file_format.c_str(),"sg") == 0 )
+	else if(file_format == "sg")
 		sg = true;
 
 	if(gl)
