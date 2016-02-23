@@ -311,6 +311,20 @@ struct Vertex_RGB
 	char b;
 };
 
+struct Triangle_RGB
+{
+	Triangle_RGB() : v1(0), v2(0), v3(0), r(0), g(0), b(0) {}
+	Triangle_RGB(uint v1, uint v2, uint v3, char r, char g, char b)
+		: v1(v1), v2(v2), v3(v3), r(r), g(g), b(b) {}
+
+	uint v1;
+	uint v2;
+	uint v3;
+	char r;
+	char g;
+	char b;
+};
+
 /**
  * A goe coordinate bounding box
  */
@@ -1146,16 +1160,22 @@ private:
 	std::map<uint,std::list<uint>> layers;
 };
 
-struct SimpleGraph
+/**
+ * A graph specifically made to display nodes, edges and triangles of a triangulation of a sphere surface.
+ */
+struct TriangleGraph
 {
-	SimpleGraph()
-		: prgm_handle(0), num_nodes(0), node_va_handle(0), node_vbo_handle(0), node_ibo_handle(0),
-		num_edges(0), edge_va_handle(0), edge_vbo_handle(0), edge_ibo_handle(0)
+	TriangleGraph()
+		: triangle_prgm_handle(0), nodeEdge_prgm_handle(0),
+		num_nodes(0), node_va_handle(0), node_vbo_handle(0), node_ibo_handle(0),
+		num_edges(0), edge_va_handle(0), edge_vbo_handle(0), edge_ibo_handle(0),
+		num_triangles(0), triangle_va_handle(0), triangle_vbo_handle(0), triangle_ibo_handle(0)
 	{
-		prgm_handle = createShaderProgram("../src/simpleGraph_v.glsl","../src/simpleGraph_f.glsl",{"v_geoCoords","v_colour"});
+		triangle_prgm_handle = createShaderProgram("../src/triangleGraph_triangle_v.glsl","../src/triangleGraph_triangle_f.glsl",{"v_geoCoords","v_colour"});
+		nodeEdge_prgm_handle = createShaderProgram("../src/triangleGraph_nodeEdge_v.glsl","../src/triangleGraph_nodeEdge_f.glsl",{"v_geoCoords","v_colour"});
 	}
-	SimpleGraph(const SimpleGraph&) = delete;
-	~SimpleGraph()
+	TriangleGraph(const TriangleGraph&) = delete;
+	~TriangleGraph()
 	{
 		if( node_va_handle != 0 )
 		{
@@ -1181,32 +1201,51 @@ struct SimpleGraph
 			glDeleteVertexArrays(1, &edge_va_handle);
 		}
 
+		if( triangle_va_handle != 0 )
+		{
+			// delete mesh resources
+			glBindVertexArray(triangle_va_handle);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+			glDeleteBuffers(1, &triangle_ibo_handle);
+			glBindBuffer(GL_ARRAY_BUFFER,0);
+			glDeleteBuffers(1, &triangle_vbo_handle);
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &triangle_va_handle);
+		}
+
 		// delete shader program
-		glDeleteProgram(prgm_handle);
+		glDeleteProgram(triangle_prgm_handle);
+		glDeleteProgram(nodeEdge_prgm_handle);
 	}
 
-	GLuint prgm_handle;
+	GLuint triangle_prgm_handle;
+	GLuint nodeEdge_prgm_handle;
 
 	size_t num_nodes;
+	size_t num_edges;
+	size_t num_triangles;
 
 	GLuint node_va_handle;
-
 	GLuint node_vbo_handle;
-
 	GLuint node_ibo_handle;
 
-	size_t num_edges;
-
 	GLuint edge_va_handle;
-
 	GLuint edge_vbo_handle;
-
 	GLuint edge_ibo_handle;
 
-	void loadGraphData(std::vector<Node_RGB>& nodes, std::vector<Edge_RGB>& edges)
+	GLuint triangle_va_handle;
+	GLuint triangle_vbo_handle;
+	GLuint triangle_ibo_handle;
+
+	void loadGraphData(std::vector<Node_RGB>& nodes, std::vector<Edge_RGB>& edges, std::vector<Triangle_RGB>& triangles)
 	{
 		num_nodes = nodes.size();
 		num_edges = edges.size();
+		num_triangles = triangles.size();
+
+		//////////
+		// Nodes
+		//////////
 
 		std::vector<Vertex_RGB> node_vertices;
 		std::vector<uint> node_indices;
@@ -1225,31 +1264,6 @@ struct SimpleGraph
 
 			node_indices.push_back(index_counter++);
 		}
-
-
-		//TODO create geometry for edges
-
-		std::vector<Vertex_RGB> edge_vertices;
-		std::vector<uint> edge_indices;
-
-		// At least as many vertices as there are nodes are required
-		edge_vertices.reserve(nodes.size());
-	
-		// Each edge contributes two indices
-		edge_indices.reserve(edges.size()*2);
-
-		index_counter = 0;
-		for(auto& edge : edges)
-		{
-			edge_vertices.push_back(Vertex_RGB(nodes[edge.source].lon,nodes[edge.source].lat,edge.r,edge.g,edge.b));
-			edge_vertices.push_back(Vertex_RGB(nodes[edge.target].lon,nodes[edge.target].lat,edge.r,edge.g,edge.b));
-
-			edge_indices.push_back(index_counter++);
-			edge_indices.push_back(index_counter++);
-
-			//TODO could be possible to optimize by findign vertices of the same color
-		}
-
 
 		// Allocate GPU memory and send data
 		if(node_vertices.size() < 1 || node_indices.size() < 1)
@@ -1284,6 +1298,32 @@ struct SimpleGraph
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 
+		//////////
+		// Edges
+		//////////
+
+		std::vector<Vertex_RGB> edge_vertices;
+		std::vector<uint> edge_indices;
+
+		// At least as many vertices as there are nodes are required
+		edge_vertices.reserve(nodes.size());
+	
+		// Each edge contributes two indices
+		edge_indices.reserve(edges.size()*2);
+
+		index_counter = 0;
+		for(auto& edge : edges)
+		{
+			edge_vertices.push_back(Vertex_RGB(nodes[edge.source].lon,nodes[edge.source].lat,edge.r,edge.g,edge.b));
+			edge_vertices.push_back(Vertex_RGB(nodes[edge.target].lon,nodes[edge.target].lat,edge.r,edge.g,edge.b));
+
+			edge_indices.push_back(index_counter++);
+			edge_indices.push_back(index_counter++);
+
+			//TODO could be possible to optimize by finding vertices of the same color
+		}
+
+		// Allocate GPU memory and send data
 		if(edge_vertices.size() < 1 || edge_indices.size() < 1)
 			return;
 
@@ -1314,22 +1354,90 @@ struct SimpleGraph
 		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+
+		//////////////
+		// Triangles
+		//////////////
+
+		std::vector<Vertex_RGB> triangle_vertices;
+		std::vector<uint> triangle_indices;
+
+		// At least as many vertices as there are nodes are required
+		triangle_vertices.reserve(nodes.size());
+	
+		// Each edge contributes two indices
+		triangle_indices.reserve(triangles.size()*3);
+
+		index_counter = 0;
+		for(auto& triangle : triangles)
+		{
+			triangle_vertices.push_back(Vertex_RGB(nodes[triangle.v1].lon,nodes[triangle.v1].lat,triangle.r,triangle.g,triangle.b));
+			triangle_vertices.push_back(Vertex_RGB(nodes[triangle.v2].lon,nodes[triangle.v2].lat,triangle.r,triangle.g,triangle.b));
+			triangle_vertices.push_back(Vertex_RGB(nodes[triangle.v3].lon,nodes[triangle.v3].lat,triangle.r,triangle.g,triangle.b));
+
+			triangle_indices.push_back(index_counter++);
+			triangle_indices.push_back(index_counter++);
+			triangle_indices.push_back(index_counter++);
+
+			//TODO could be possible to optimize by finding vertices of the same color
+		}
+
+		// Allocate GPU memory and send data
+		if(triangle_vertices.size() < 1 || triangle_indices.size() < 1)
+			return;
+
+		va_size = sizeof(Vertex_RGB) * triangle_vertices.size();
+		vi_size = sizeof(uint) * triangle_indices.size();
+
+		if(triangle_va_handle == 0 || triangle_vbo_handle == 0 || triangle_ibo_handle == 0)
+		{
+			glGenVertexArrays(1, &triangle_va_handle);
+			glGenBuffers(1, &triangle_vbo_handle);
+			glGenBuffers(1, &triangle_ibo_handle);
+		}
+
+		glBindVertexArray(triangle_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, triangle_vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, triangle_vertices.data(), GL_DYNAMIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, triangle_ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, triangle_indices.data(), GL_DYNAMIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(triangle_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, triangle_vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_RGB), 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
 	void draw(OrbitalCamera& camera,float scale)
 	{
-		glUseProgram(prgm_handle);
+		glUseProgram(triangle_prgm_handle);
 
-		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
-		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(triangle_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(triangle_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+		glBindVertexArray(triangle_va_handle);
+		glDrawElements(GL_TRIANGLES, (GLsizei)num_triangles*3, GL_UNSIGNED_INT, nullptr );
+
+		glUseProgram(nodeEdge_prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(nodeEdge_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(nodeEdge_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
 
 		glLineWidth(std::max(1.0f,20.0f * scale));
 		glBindVertexArray(edge_va_handle);
-		glDrawElements(GL_LINES,  (GLsizei)num_edges * 2,  GL_UNSIGNED_INT,  (void*)(0) );
+		glDrawElements(GL_LINES,  (GLsizei)num_edges * 2,  GL_UNSIGNED_INT, nullptr );
 
 		glPointSize(std::max(2.0f,15.0f * scale));
 		glBindVertexArray(node_va_handle);
-		glDrawElements(GL_POINTS,  (GLsizei)num_nodes,  GL_UNSIGNED_INT,  (void*)(0) );
+		glDrawElements(GL_POINTS,  (GLsizei)num_nodes,  GL_UNSIGNED_INT, nullptr );
 	}
 };
 
@@ -2059,7 +2167,17 @@ namespace Parser
 		e.emplace_back(std::stoul(source), std::stoul(target), std::stoi(r), std::stoi(g), std::stoi(b));
 	}
 
-	bool parseTxtSimpleGraphFile(const std::string& graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e)
+	void createTriangleRGB(const std::string& input_string, std::vector<Triangle_RGB>& t)
+	{
+		std::string v1, v2, v3, r, g, b;
+
+		std::stringstream ss(input_string);
+		ss >> v1 >> v2 >> v3 >> r >> g >> b;
+
+		t.emplace_back(std::stoul(v1), std::stoul(v2), std::stoul(v3), std::stoi(r), std::stoi(g), std::stoi(b));
+	}
+
+	bool parseTxtTriangleGraphFile(const std::string& graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e, std::vector<Triangle_RGB>& t)
 	{
 		std::string buffer;
 		std::ifstream file;
@@ -2074,6 +2192,8 @@ namespace Parser
 			uint node_count = std::stoul(buffer);
 			getline(file,buffer,'\n');
 			uint edge_count = std::stoul(buffer);
+			getline(file,buffer,'\n');
+			uint triangle_count = std::stoul(buffer);
 
 			n.reserve(node_count);
 			for(uint i=0; i<node_count; i++)
@@ -2088,6 +2208,14 @@ namespace Parser
 				getline(file,buffer,'\n');
 				createEdgeRGB(buffer, e);
 			}
+
+			t.reserve(triangle_count);
+			for(uint k=0; k<triangle_count; k++)
+			{
+				getline(file,buffer,'\n');
+				createTriangleRGB(buffer, t);
+			}
+
 			file.close();
 
 			return true;
@@ -2180,6 +2308,7 @@ int main(int argc, char*argv[])
 
 	std::vector<Node_RGB> nodes_rgb;
 	std::vector<Edge_RGB> edges_rgb;
+	std::vector<Triangle_RGB> triangles_rgb;
 
 	/* Decide which graph format to load */
 	bool gl = false;
@@ -2195,7 +2324,7 @@ int main(int argc, char*argv[])
 	if(gl)
 		Parser::parseTxtGraphFile(filepath,nodes,edges);
 	else if(sg)
-		Parser::parseTxtSimpleGraphFile(filepath,nodes_rgb,edges_rgb);
+		Parser::parseTxtTriangleGraphFile(filepath,nodes_rgb,edges_rgb,triangles_rgb);
 
 	/////////////////////////////////////////////////////////////////////
 	// Creation of graphics resources, i.e. shader programs, meshes, etc.
@@ -2219,9 +2348,9 @@ int main(int argc, char*argv[])
 			lineGraph.addSubgraph(nodes,edges);
 
 		/* Create renderable simple graph (mesh) */
-		SimpleGraph simpleColouredGraph;
+		TriangleGraph simpleColouredGraph;
 		if(sg)
-			simpleColouredGraph.loadGraphData(nodes_rgb,edges_rgb);
+			simpleColouredGraph.loadGraphData(nodes_rgb,edges_rgb,triangles_rgb);
 
 		/* Create polygons */
 		Polygons polys;
