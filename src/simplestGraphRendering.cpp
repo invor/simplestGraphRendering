@@ -2345,8 +2345,7 @@ namespace Controls {
 			glBindFramebuffer(GL_FRAMEBUFFER, active_triangleGraph->picking_fbo_handle);
 			GLfloat* data = new GLfloat[1]; data[0] = -1;
 			glReadBuffer(GL_COLOR_ATTACHMENT0);
-			//glReadPixels((GLint)(pos_x_normalized*1920.0), (GLint)(1080.0 - pos_y_normalized*1080.0), 1, 1, GL_RED_INTEGER, GL_INT, data);
-			glReadPixels((GLint)pos_x, (GLint)(900 - pos_y), 1, 1, GL_RED_INTEGER, GL_INT, data);
+			glReadPixels((GLint)(pos_x_normalized*1600.0), (GLint)(900.0 - pos_y_normalized*900.0), 1, 1, GL_RED_INTEGER, GL_INT, data);
 
 			//std::cout<<"Id: "<<(int)*data<<std::endl;
 
