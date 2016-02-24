@@ -9,11 +9,11 @@ in vec2 v_geoCoords;
 in int v_id;
 in vec3 v_colour;
 
-out vec3 colour;
+flat out int id;
 
 void main()
 {
-    colour = v_colour;
+    id = v_id;
 
     float lat_sin = sin( (PI/180.0) * v_geoCoords.y);
 	float lon_sin = sin( (PI/180.0) * v_geoCoords.x);

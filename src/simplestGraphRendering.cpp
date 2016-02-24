@@ -17,6 +17,7 @@
 #include <memory>
 #include <map>
 #include <list>
+#include <chrono>
 
 typedef unsigned int uint;
 
@@ -309,6 +310,31 @@ struct Vertex_RGB
 	char r;
 	char g;
 	char b;
+};
+
+struct Vertex_ID_RGB
+{
+	Vertex_ID_RGB() : longitude(0.0), latitude(0.0), r(0), g(0), b(0), id(-1) {}
+	Vertex_ID_RGB(float lon, float lat, char r, char g, char b, int id)
+		: longitude(lon), latitude(lat), r(r), g(g), b(b), id(id) {}
+
+	float longitude;
+	float latitude;
+	int id;
+	char r;
+	char g;
+	char b;
+};
+
+struct Vertex_XYZ
+{
+	Vertex_XYZ() : x(0.0f), y(0.0f), z(0.0f) {}
+	Vertex_XYZ(float x, float y, float z)
+		: x(x), y(y), z(z) {}
+
+	float x;
+	float y;
+	float z;
 };
 
 struct Triangle_RGB
@@ -1169,10 +1195,138 @@ struct TriangleGraph
 		: triangle_prgm_handle(0), nodeEdge_prgm_handle(0),
 		num_nodes(0), node_va_handle(0), node_vbo_handle(0), node_ibo_handle(0),
 		num_edges(0), edge_va_handle(0), edge_vbo_handle(0), edge_ibo_handle(0),
-		num_triangles(0), triangle_va_handle(0), triangle_vbo_handle(0), triangle_ibo_handle(0)
+		num_triangles(0), triangle_va_handle(0), triangle_vbo_handle(0), triangle_ibo_handle(0),
+		sphere_va_handle(0), sphere_vbo_handle(0), sphere_ibo_handle(0), show_sphere(false),
+		num_sphere_indices(0), sphere_world_position(1.0f,0.0f,0.0f), sphere_scale(1.0f), sphere_target_scale(1.0f)
 	{
-		triangle_prgm_handle = createShaderProgram("../src/triangleGraph_triangle_v.glsl","../src/triangleGraph_triangle_f.glsl",{"v_geoCoords","v_colour"});
+		// Create shader programs
+		triangle_prgm_handle = createShaderProgram("../src/triangleGraph_triangle_v.glsl","../src/triangleGraph_triangle_f.glsl",{"v_geoCoords","v_id","v_colour"});
 		nodeEdge_prgm_handle = createShaderProgram("../src/triangleGraph_nodeEdge_v.glsl","../src/triangleGraph_nodeEdge_f.glsl",{"v_geoCoords","v_colour"});
+		picking_prgm_handle = createShaderProgram("../src/triangleGraph_picking_v.glsl","../src/triangleGraph_picking_f.glsl",{"v_geoCoords","v_id","v_colour"});
+		sphere_prgm_handle = createShaderProgram("../src/triangleGraph_sphere_v.glsl","../src/triangleGraph_sphere_f.glsl",{"v_position"});
+
+		// Create framebuffer object for picking pass
+		glGenFramebuffers(1, &picking_fbo_handle);
+		glGenTextures(1, &picking_color_attachment_handle);
+
+		glBindTexture(GL_TEXTURE_2D, picking_color_attachment_handle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, 1600, 900, 0, GL_RED_INTEGER, GL_INT, nullptr);
+		glBindTexture(GL_TEXTURE_2D,0);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, picking_fbo_handle);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, picking_color_attachment_handle, 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+		// Create sphere mesh
+		// Create intial icosahedron
+		GLfloat x = 0.525731112119133606f;
+		GLfloat z = 0.850650808352039932f;
+
+		std::vector<Vertex_XYZ> sphere_vertices({Vertex_XYZ(-x,0.0f,z),
+												Vertex_XYZ(x,0.0f,z),
+												Vertex_XYZ(-x,0.0f,-z),
+												Vertex_XYZ(x,0.0f,-z),
+												Vertex_XYZ(0.0f,z,x),
+												Vertex_XYZ(0.0f,z,-x),
+												Vertex_XYZ(0.0f,-z,x),
+												Vertex_XYZ(0.0f,-z,-x),
+												Vertex_XYZ(z,x,0.0f),
+												Vertex_XYZ(-z,x,0.0f),
+												Vertex_XYZ(z,-x,0.0f),
+												Vertex_XYZ(-z,-x,0.0f) });
+		std::vector<unsigned int> sphere_indices({	0,4,1,	0,9,4,	9,5,4,	4,5,8,	4,8,1,
+													8,10,1,	8,3,10,	5,3,8,	5,2,3,	2,7,3,
+													7,10,3,	7,6,10,	7,11,6,	11,0,6,	0,1,6,
+													6,1,10,	9,0,11,	9,11,2,	9,2,5,	7,2,11 });
+
+		// Subdivide icosahedron
+		for(int subdivs=0; subdivs<4; subdivs++)
+		{
+			std::vector<unsigned int> refined_indices;
+			refined_indices.reserve( sphere_indices.size() * 3);
+
+			for(int i=0; i<sphere_indices.size(); i=i+3)
+			{
+				unsigned int idx1 = sphere_indices[i];
+				unsigned int idx2 = sphere_indices[i+1];
+				unsigned int idx3 = sphere_indices[i+2];
+
+				Math::Vec3 newVtx1( (sphere_vertices[idx1].x + sphere_vertices[idx2].x),
+								(sphere_vertices[idx1].y + sphere_vertices[idx2].y),
+								(sphere_vertices[idx1].z + sphere_vertices[idx2].z) );
+				newVtx1 = Math::normalize(newVtx1);
+
+				Math::Vec3 newVtx2( (sphere_vertices[idx2].x + sphere_vertices[idx3].x),
+								(sphere_vertices[idx2].y + sphere_vertices[idx3].y),
+								(sphere_vertices[idx2].z + sphere_vertices[idx3].z));
+				newVtx2 = Math::normalize(newVtx2);
+
+				Math::Vec3 newVtx3( (sphere_vertices[idx3].x + sphere_vertices[idx1].x),
+								(sphere_vertices[idx3].y + sphere_vertices[idx1].y),
+								(sphere_vertices[idx3].z + sphere_vertices[idx1].z));
+				newVtx3 = Math::normalize(newVtx3);
+
+				unsigned int newIdx1 = sphere_vertices.size();
+				sphere_vertices.push_back( Vertex_XYZ(newVtx1.x,newVtx1.y,newVtx1.z) );
+
+				unsigned int newIdx2 = newIdx1 +1;
+				sphere_vertices.push_back( Vertex_XYZ(newVtx2.x,newVtx2.y,newVtx2.z) );
+
+				unsigned int newIdx3 = newIdx2 +1;
+				sphere_vertices.push_back( Vertex_XYZ(newVtx3.x,newVtx3.y,newVtx3.z) );
+
+				refined_indices.push_back(idx1);
+				refined_indices.push_back(newIdx1);
+				refined_indices.push_back(newIdx3);
+				
+				refined_indices.push_back(newIdx1);
+				refined_indices.push_back(idx2);
+				refined_indices.push_back(newIdx2);
+
+				refined_indices.push_back(newIdx3);
+				refined_indices.push_back(newIdx1);
+				refined_indices.push_back(newIdx2);
+
+				refined_indices.push_back(newIdx3);
+				refined_indices.push_back(newIdx2);
+				refined_indices.push_back(idx3);
+			}
+
+			sphere_indices.clear();
+
+			sphere_indices = refined_indices;
+		}
+		
+		num_sphere_indices = sphere_indices.size();
+
+		auto va_size = sizeof(Vertex_XYZ) * sphere_vertices.size();
+		auto vi_size = sizeof(uint) * sphere_indices.size();
+
+		glGenVertexArrays(1, &sphere_va_handle);
+		glGenBuffers(1, &sphere_vbo_handle);
+		glGenBuffers(1, &sphere_ibo_handle);
+
+		glBindVertexArray(sphere_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, sphere_vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, va_size, sphere_vertices.data(), GL_DYNAMIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphere_ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, sphere_indices.data(), GL_DYNAMIC_DRAW);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		glBindVertexArray(sphere_va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, sphere_vbo_handle);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(Vertex_XYZ), 0);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 	}
 	TriangleGraph(const TriangleGraph&) = delete;
 	~TriangleGraph()
@@ -1213,13 +1367,26 @@ struct TriangleGraph
 			glDeleteVertexArrays(1, &triangle_va_handle);
 		}
 
+		// delete mesh resources
+		glBindVertexArray(sphere_va_handle);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glDeleteBuffers(1, &sphere_ibo_handle);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glDeleteBuffers(1, &sphere_vbo_handle);
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &sphere_va_handle);
+
 		// delete shader program
 		glDeleteProgram(triangle_prgm_handle);
 		glDeleteProgram(nodeEdge_prgm_handle);
+		glDeleteProgram(picking_prgm_handle);
+		glDeleteProgram(sphere_prgm_handle);
 	}
 
 	GLuint triangle_prgm_handle;
 	GLuint nodeEdge_prgm_handle;
+	GLuint picking_prgm_handle;
+	GLuint sphere_prgm_handle;
 
 	size_t num_nodes;
 	size_t num_edges;
@@ -1237,11 +1404,33 @@ struct TriangleGraph
 	GLuint triangle_vbo_handle;
 	GLuint triangle_ibo_handle;
 
+	GLuint picking_fbo_handle;
+	GLuint picking_color_attachment_handle;
+
+	bool show_sphere;
+	uint num_sphere_indices;
+	Math::Vec3 sphere_world_position;
+	float sphere_scale;
+	float sphere_target_scale;
+	std::chrono::time_point<std::chrono::system_clock,std::chrono::system_clock::duration> t_0;
+	std::chrono::time_point<std::chrono::system_clock,std::chrono::system_clock::duration> t_1;
+
+	GLuint sphere_va_handle;
+	GLuint sphere_vbo_handle;
+	GLuint sphere_ibo_handle;
+
+	// Need a copy of graph data for sphere creation
+	std::vector<Node_RGB> nodes;
+	std::vector<Triangle_RGB> triangles;
+
 	void loadGraphData(std::vector<Node_RGB>& nodes, std::vector<Edge_RGB>& edges, std::vector<Triangle_RGB>& triangles)
 	{
 		num_nodes = nodes.size();
 		num_edges = edges.size();
 		num_triangles = triangles.size();
+
+		this->nodes = nodes;
+		this->triangles = triangles;
 
 		//////////
 		// Nodes
@@ -1360,7 +1549,7 @@ struct TriangleGraph
 		// Triangles
 		//////////////
 
-		std::vector<Vertex_RGB> triangle_vertices;
+		std::vector<Vertex_ID_RGB> triangle_vertices;
 		std::vector<uint> triangle_indices;
 
 		// At least as many vertices as there are nodes are required
@@ -1370,16 +1559,18 @@ struct TriangleGraph
 		triangle_indices.reserve(triangles.size()*3);
 
 		index_counter = 0;
+		int triangle_counter = 0;
 		for(auto& triangle : triangles)
 		{
-			triangle_vertices.push_back(Vertex_RGB(nodes[triangle.v1].lon,nodes[triangle.v1].lat,triangle.r,triangle.g,triangle.b));
-			triangle_vertices.push_back(Vertex_RGB(nodes[triangle.v2].lon,nodes[triangle.v2].lat,triangle.r,triangle.g,triangle.b));
-			triangle_vertices.push_back(Vertex_RGB(nodes[triangle.v3].lon,nodes[triangle.v3].lat,triangle.r,triangle.g,triangle.b));
+			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v1].lon,nodes[triangle.v1].lat,triangle.r,triangle.g,triangle.b,triangle_counter));
+			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v2].lon,nodes[triangle.v2].lat,triangle.r,triangle.g,triangle.b,triangle_counter));
+			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v3].lon,nodes[triangle.v3].lat,triangle.r,triangle.g,triangle.b,triangle_counter));
 
 			triangle_indices.push_back(index_counter++);
 			triangle_indices.push_back(index_counter++);
 			triangle_indices.push_back(index_counter++);
 
+			triangle_counter++;
 			//TODO could be possible to optimize by finding vertices of the same color
 		}
 
@@ -1387,7 +1578,7 @@ struct TriangleGraph
 		if(triangle_vertices.size() < 1 || triangle_indices.size() < 1)
 			return;
 
-		va_size = sizeof(Vertex_RGB) * triangle_vertices.size();
+		va_size = sizeof(Vertex_ID_RGB) * triangle_vertices.size();
 		vi_size = sizeof(uint) * triangle_indices.size();
 
 		if(triangle_va_handle == 0 || triangle_vbo_handle == 0 || triangle_ibo_handle == 0)
@@ -1399,9 +1590,9 @@ struct TriangleGraph
 
 		glBindVertexArray(triangle_va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, triangle_vbo_handle);
-		glBufferData(GL_ARRAY_BUFFER, va_size, triangle_vertices.data(), GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, va_size, triangle_vertices.data(), GL_STATIC_DRAW);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, triangle_ibo_handle);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, triangle_indices.data(), GL_DYNAMIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, vi_size, triangle_indices.data(), GL_STATIC_DRAW);
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER,0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1409,9 +1600,17 @@ struct TriangleGraph
 		glBindVertexArray(triangle_va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, triangle_vbo_handle);
 		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_RGB), 0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_ID_RGB), 0);
+		//	glEnableVertexAttribArray(1);
+		//	glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_ID_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		//	glEnableVertexAttribArray(2);
+		//	glVertexAttribPointer(2, 1, GL_INT, false, sizeof(Vertex_ID_RGB), (GLvoid*) ((sizeof(GL_FLOAT)*2) + (sizeof(GL_UNSIGNED_BYTE)*3)) );
+
 		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glVertexAttribPointer(1, 1, GL_INT, false, sizeof(Vertex_ID_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_ID_RGB), (GLvoid*) ((sizeof(GL_FLOAT)*2) + sizeof(GL_INT)) );
+
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
@@ -1438,6 +1637,90 @@ struct TriangleGraph
 		glPointSize(std::max(2.0f,15.0f * scale));
 		glBindVertexArray(node_va_handle);
 		glDrawElements(GL_POINTS,  (GLsizei)num_nodes,  GL_UNSIGNED_INT, nullptr );
+
+		t_1 = std::chrono::high_resolution_clock::now();
+		float dt = std::chrono::duration_cast<std::chrono::duration<double>>(t_1-t_0).count();
+		t_0 = std::chrono::high_resolution_clock::now();
+
+		if(show_sphere)
+		{
+			glUseProgram(sphere_prgm_handle);
+
+			
+			sphere_scale = (sphere_scale < sphere_target_scale) ? (sphere_scale + 0.025 * dt) : sphere_target_scale;
+
+			Math::Mat4x4 model_matrix;
+			model_matrix[0] = sphere_scale;
+			model_matrix[5] = sphere_scale;
+			model_matrix[10] = sphere_scale;
+			model_matrix[12] = sphere_world_position.x;
+			model_matrix[13] = sphere_world_position.y;
+			model_matrix[14] = sphere_world_position.z;
+			model_matrix[15] = 1.0f;
+
+			glUniformMatrix4fv(glGetUniformLocation(sphere_prgm_handle, "model_matrix"), 1, GL_FALSE, model_matrix.data.data());
+			glUniformMatrix4fv(glGetUniformLocation(sphere_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+			glUniformMatrix4fv(glGetUniformLocation(sphere_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+			glBindVertexArray(sphere_va_handle);
+			glDrawElements(GL_TRIANGLES, (GLsizei)num_sphere_indices, GL_UNSIGNED_INT, nullptr );
+		}
+	}
+
+	Math::Vec3 geoToCartesian(float lon, float lat)
+	{
+		float lat_sin = sin( (PI/180.0) * lat);
+		float lon_sin = sin( (PI/180.0) * lon);
+		
+		float lat_cos = cos( (PI/180.0) * lat);
+		float lon_cos = cos( (PI/180.0) *lon);
+		
+		float r = 1.0; //6378137.0;
+		
+		return Math::Vec3( lon_sin * lat_cos * r,
+							lat_sin * r,
+							lat_cos * lon_cos * r );
+	}
+
+	void pickingPass(OrbitalCamera& camera,float scale)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, picking_fbo_handle);
+		glClearColor(-1,-1,-1,-1);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glViewport(0, 0, 1600, 900);
+
+		GLenum bufs[1];
+		bufs[0] = GL_COLOR_ATTACHMENT0;
+		glDrawBuffers(1,bufs);
+
+		glUseProgram(picking_prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(picking_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(picking_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+		glBindVertexArray(triangle_va_handle);
+		glDrawElements(GL_TRIANGLES, (GLsizei)num_triangles*3, GL_UNSIGNED_INT, nullptr );
+	}
+
+	void placeSphere(int triangle_id)
+	{
+		if(triangle_id < 0)
+		{
+			show_sphere = false;
+			return;
+		}
+
+		Math::Vec3 v1 = geoToCartesian(nodes[triangles[triangle_id].v1].lon,nodes[triangles[triangle_id].v1].lat);
+		Math::Vec3 v2 = geoToCartesian(nodes[triangles[triangle_id].v2].lon,nodes[triangles[triangle_id].v2].lat);
+		Math::Vec3 v3 = geoToCartesian(nodes[triangles[triangle_id].v3].lon,nodes[triangles[triangle_id].v3].lat);
+
+		show_sphere = true;
+		// http://www.ics.uci.edu/~eppstein/junkyard/circumcenter.html
+		sphere_world_position = v1 + (( pow((v3-v1).length(),2.0f) * Math::cross(Math::cross((v2-v1),(v3-v1)),(v2-v1))
+									+ pow((v2-v1).length(),2.0f) * Math::cross((v3-v1),Math::cross((v2-v1),(v3-v1))) )
+									/ (2.0f * pow( Math::cross((v2-v1),(v3-v1)).length() ,2.0f)));
+		sphere_target_scale = (sphere_world_position - v1).length();
+		sphere_scale = 0.0;
 	}
 };
 
@@ -2032,6 +2315,8 @@ namespace Controls {
 	namespace
 	{
 		std::array<float,2> latest_cursor_position = {{0.0,0.0}};
+
+		TriangleGraph* active_triangleGraph;
 	}
 
 	void mouseScrollFeedback(GLFWwindow *window, double x_offset, double y_offset)
@@ -2041,6 +2326,34 @@ namespace Controls {
 		float camera_height_inertia = std::pow( (active_camera->orbit - 1.0f )*0.1f, 1.0f);
 
 		active_camera->moveInOrbit(0.0f,0.0f,-camera_height_inertia * (float)y_offset);
+	}
+
+	void mouseButtonFeedback(GLFWwindow* window, int button, int action, int mods)
+	{
+		if(button == GLFW_MOUSE_BUTTON_1 && action == GLFW_RELEASE)
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			int width, height;
+			glfwGetFramebufferSize(window, &width, &height);
+
+			double pos_x, pos_y;
+			glfwGetCursorPos(window, &pos_x, &pos_y);
+
+			double pos_x_normalized = (pos_x/(double)width);
+			double pos_y_normalized = (pos_y/(double)height);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, active_triangleGraph->picking_fbo_handle);
+			GLfloat* data = new GLfloat[1]; data[0] = -1;
+			glReadBuffer(GL_COLOR_ATTACHMENT0);
+			//glReadPixels((GLint)(pos_x_normalized*1920.0), (GLint)(1080.0 - pos_y_normalized*1080.0), 1, 1, GL_RED_INTEGER, GL_INT, data);
+			glReadPixels((GLint)pos_x, (GLint)(900 - pos_y), 1, 1, GL_RED_INTEGER, GL_INT, data);
+
+			//std::cout<<"Id: "<<(int)*data<<std::endl;
+
+			active_triangleGraph->placeSphere((int)*data);
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
 	}
 
 	void updateOrbitalCamera(GLFWwindow *window)
@@ -2064,6 +2377,11 @@ namespace Controls {
 		}
 
 		latest_cursor_position = currentCursorPosition;
+	}
+
+	void setActiveTriangleGraph(TriangleGraph* g)
+	{
+		active_triangleGraph = g;
 	}
 
 }
@@ -2295,6 +2613,7 @@ int main(int argc, char*argv[])
 	/* Intialize controls */
 	glfwSetWindowSizeCallback(window,windowSizeCallback);
 	glfwSetScrollCallback(window, Controls::mouseScrollFeedback);
+	glfwSetMouseButtonCallback(window, Controls::mouseButtonFeedback);
 	/* Hide cursor */
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
@@ -2350,7 +2669,10 @@ int main(int argc, char*argv[])
 		/* Create renderable simple graph (mesh) */
 		TriangleGraph simpleColouredGraph;
 		if(sg)
+		{
 			simpleColouredGraph.loadGraphData(nodes_rgb,edges_rgb,triangles_rgb);
+			Controls::setActiveTriangleGraph(&simpleColouredGraph);
+		}
 
 		/* Create polygons */
 		Polygons polys;
@@ -2422,8 +2744,14 @@ int main(int argc, char*argv[])
 			if(gl)
 				lineGraph.draw( camera, scale );
 			else if(sg)
+			{
 				simpleColouredGraph.draw( camera, scale );
+				simpleColouredGraph.pickingPass( camera, scale );
+			}
 
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glfwGetFramebufferSize(window, &width, &height);
+			glViewport(0, 0, width, height);
 
 			/* Draw labels */
 			labels.draw(camera);
