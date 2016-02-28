@@ -1219,8 +1219,14 @@ struct TriangleGraph
 
 		glBindFramebuffer(GL_FRAMEBUFFER, picking_fbo_handle);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, picking_color_attachment_handle, 0);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+		glGenRenderbuffers(1, &picking_depth_buffer_handle);
+		glBindRenderbuffer(GL_RENDERBUFFER, picking_depth_buffer_handle);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 1600, 900);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, picking_depth_buffer_handle);
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		// Create sphere mesh
 		// Create intial icosahedron
@@ -1406,6 +1412,7 @@ struct TriangleGraph
 
 	GLuint picking_fbo_handle;
 	GLuint picking_color_attachment_handle;
+	GLuint picking_depth_buffer_handle;
 
 	bool show_sphere;
 	uint num_sphere_indices;
@@ -1615,26 +1622,34 @@ struct TriangleGraph
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 
-	void draw(OrbitalCamera& camera,float scale)
+	void draw(OrbitalCamera& camera,float triangle_transparency)
 	{
+		glCullFace(GL_FRONT);
+
 		glUseProgram(triangle_prgm_handle);
 
 		glUniformMatrix4fv(glGetUniformLocation(triangle_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
 		glUniformMatrix4fv(glGetUniformLocation(triangle_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+		glUniform1fv(glGetUniformLocation(triangle_prgm_handle, "transparency"),1, &triangle_transparency);
 
 		glBindVertexArray(triangle_va_handle);
 		glDrawElements(GL_TRIANGLES, (GLsizei)num_triangles*3, GL_UNSIGNED_INT, nullptr );
+
+		glCullFace(GL_BACK);
+
+		glEnable(GL_DEPTH_TEST);
 
 		glUseProgram(nodeEdge_prgm_handle);
 
 		glUniformMatrix4fv(glGetUniformLocation(nodeEdge_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
 		glUniformMatrix4fv(glGetUniformLocation(nodeEdge_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
 
-		glLineWidth(std::max(1.0f,20.0f * scale));
+		//glLineWidth(std::max(1.0f,20.0f * scale));
 		glBindVertexArray(edge_va_handle);
 		glDrawElements(GL_LINES,  (GLsizei)num_edges * 2,  GL_UNSIGNED_INT, nullptr );
 
-		glPointSize(std::max(2.0f,15.0f * scale));
+		//glPointSize(std::max(2.0f,15.0f * scale));
+		glPointSize(5.0);
 		glBindVertexArray(node_va_handle);
 		glDrawElements(GL_POINTS,  (GLsizei)num_nodes,  GL_UNSIGNED_INT, nullptr );
 
@@ -1642,12 +1657,24 @@ struct TriangleGraph
 		float dt = std::chrono::duration_cast<std::chrono::duration<double>>(t_1-t_0).count();
 		t_0 = std::chrono::high_resolution_clock::now();
 
+
+		// Draw triangle front faces
+		glUseProgram(triangle_prgm_handle);
+
+		glUniformMatrix4fv(glGetUniformLocation(triangle_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(triangle_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+		glUniform1fv(glGetUniformLocation(triangle_prgm_handle, "transparency"),1, &triangle_transparency);
+
+		glBindVertexArray(triangle_va_handle);
+		glDrawElements(GL_TRIANGLES, (GLsizei)num_triangles*3, GL_UNSIGNED_INT, nullptr );
+
+
 		if(show_sphere)
 		{
 			glUseProgram(sphere_prgm_handle);
 
 			
-			sphere_scale = (sphere_scale < sphere_target_scale) ? (sphere_scale + 0.025 * dt) : sphere_target_scale;
+			sphere_scale = (sphere_scale < sphere_target_scale) ? (sphere_scale + sphere_target_scale * dt) : sphere_target_scale;
 
 			Math::Mat4x4 model_matrix;
 			model_matrix[0] = sphere_scale;
@@ -1661,10 +1688,14 @@ struct TriangleGraph
 			glUniformMatrix4fv(glGetUniformLocation(sphere_prgm_handle, "model_matrix"), 1, GL_FALSE, model_matrix.data.data());
 			glUniformMatrix4fv(glGetUniformLocation(sphere_prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
 			glUniformMatrix4fv(glGetUniformLocation(sphere_prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
-
+			
+			glCullFace(GL_FRONT);
 			glBindVertexArray(sphere_va_handle);
 			glDrawElements(GL_TRIANGLES, (GLsizei)num_sphere_indices, GL_UNSIGNED_INT, nullptr );
 		}
+
+		glCullFace(GL_BACK);
+		glDisable(GL_DEPTH_TEST);
 	}
 
 	Math::Vec3 geoToCartesian(float lon, float lat)
@@ -1682,11 +1713,13 @@ struct TriangleGraph
 							lat_cos * lon_cos * r );
 	}
 
-	void pickingPass(OrbitalCamera& camera,float scale)
+	void pickingPass(OrbitalCamera& camera)
 	{
+		glEnable(GL_DEPTH);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, picking_fbo_handle);
 		glClearColor(-1,-1,-1,-1);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, 1600, 900);
 
 		GLenum bufs[1];
@@ -1700,6 +1733,8 @@ struct TriangleGraph
 
 		glBindVertexArray(triangle_va_handle);
 		glDrawElements(GL_TRIANGLES, (GLsizei)num_triangles*3, GL_UNSIGNED_INT, nullptr );
+
+		glDisable(GL_DEPTH);
 	}
 
 	void placeSphere(int triangle_id)
@@ -2549,6 +2584,7 @@ int main(int argc, char*argv[])
 	/////////////////////////////////////
 
 	std::string filepath;
+	float trianlge_transparency = 1.0f;
 
 	int i=1;
     if (argc < 3) {
@@ -2559,8 +2595,14 @@ int main(int argc, char*argv[])
 		if(argv[i] == (std::string) "-gf")
 		{
 			i++;
-			if(i<argc) { filepath = argv[i]; i++; }
+			if(i<argc && argv[i][0] != '-') { filepath = argv[i]; i++; }
 			else { std::cout<<"Missing parameter for -gf"<<std::endl; return 0; }
+		}
+		else if(argv[i] == (std::string) "-t")
+		{
+			i++;
+			if(i<argc && argv[i][0] != '-') { trianlge_transparency = std::stof(argv[i]); i++; }
+			else { std::cout<<"Missing parameter for -t"<<std::endl; return 0; }
 		}
 		else
 		{
@@ -2584,6 +2626,7 @@ int main(int argc, char*argv[])
 	//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
 	//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_SAMPLES,4);
     window = glfwCreateWindow(1600, 900, "Simple Graph Renderer", NULL, NULL);
     if (!window)
     {
@@ -2714,7 +2757,7 @@ int main(int argc, char*argv[])
 		//////////////////////////////////////////////////////
 
 		glEnable(GL_BLEND);
-		//glDisable(GL_CULL_FACE);
+		glEnable(GL_CULL_FACE);
 		//glDisable(GL_DEPTH_TEST);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -2722,6 +2765,11 @@ int main(int argc, char*argv[])
 		while (!glfwWindowShouldClose(window))
 		{
 			Controls::updateOrbitalCamera(window);
+
+			// update near/far clipping plane based on camera orbit
+			camera.near = 0.001f * camera.orbit;
+			camera.far = 2.0f * camera.orbit;
+			camera.updateProjectionMatrix();
 
 		    /* Render here */
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2744,8 +2792,8 @@ int main(int argc, char*argv[])
 				lineGraph.draw( camera, scale );
 			else if(sg)
 			{
-				simpleColouredGraph.draw( camera, scale );
-				simpleColouredGraph.pickingPass( camera, scale );
+				simpleColouredGraph.draw( camera, trianlge_transparency );
+				simpleColouredGraph.pickingPass( camera );
 			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2753,6 +2801,7 @@ int main(int argc, char*argv[])
 			glViewport(0, 0, width, height);
 
 			/* Draw labels */
+			//TODO fix labels if TriangleGraph is used
 			labels.draw(camera);
 
 			GeoBoundingBox bbox = camera.computeVisibleArea();

@@ -20,7 +20,8 @@ void main()
 	float lat_cos = cos( (PI/180.0) * v_geoCoords.y);
 	float lon_cos = cos( (PI/180.0) * v_geoCoords.x);
 	
-	float r = 1.0; //6378137.0;
+	//float r = 1.0; //6378137.0;
+    float r = 1.001; //6378137.0;
 	
 	vec3 world_position = vec3( lon_sin * lat_cos * r,
 								lat_sin * r,
