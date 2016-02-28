@@ -314,9 +314,9 @@ struct Vertex_RGB
 
 struct Vertex_ID_RGB
 {
-	Vertex_ID_RGB() : longitude(0.0), latitude(0.0), r(0), g(0), b(0), id(-1) {}
+	Vertex_ID_RGB() : longitude(0.0), latitude(0.0), id(-1), r(0), g(0), b(0) {}
 	Vertex_ID_RGB(float lon, float lat, char r, char g, char b, int id)
-		: longitude(lon), latitude(lat), r(r), g(g), b(b), id(id) {}
+		: longitude(lon), latitude(lat), id(id), r(r), g(g), b(b) {}
 
 	float longitude;
 	float latitude;
@@ -1192,12 +1192,12 @@ private:
 struct TriangleGraph
 {
 	TriangleGraph()
-		: triangle_prgm_handle(0), nodeEdge_prgm_handle(0),
-		num_nodes(0), node_va_handle(0), node_vbo_handle(0), node_ibo_handle(0),
-		num_edges(0), edge_va_handle(0), edge_vbo_handle(0), edge_ibo_handle(0),
-		num_triangles(0), triangle_va_handle(0), triangle_vbo_handle(0), triangle_ibo_handle(0),
-		sphere_va_handle(0), sphere_vbo_handle(0), sphere_ibo_handle(0), show_sphere(false),
-		num_sphere_indices(0), sphere_world_position(1.0f,0.0f,0.0f), sphere_scale(1.0f), sphere_target_scale(1.0f)
+		: triangle_prgm_handle(0), nodeEdge_prgm_handle(0), num_nodes(0),
+		num_edges(0), num_triangles(0), node_va_handle(0), node_vbo_handle(0), node_ibo_handle(0),
+		edge_va_handle(0), edge_vbo_handle(0), edge_ibo_handle(0),
+		triangle_va_handle(0), triangle_vbo_handle(0), triangle_ibo_handle(0), show_sphere(false),
+		num_sphere_indices(0), sphere_world_position(1.0f,0.0f,0.0f), sphere_scale(1.0f), sphere_target_scale(1.0f),
+		sphere_va_handle(0), sphere_vbo_handle(0), sphere_ibo_handle(0)
 	{
 		// Create shader programs
 		triangle_prgm_handle = createShaderProgram("../src/triangleGraph_triangle_v.glsl","../src/triangleGraph_triangle_f.glsl",{"v_geoCoords","v_id","v_colour"});
@@ -1256,7 +1256,7 @@ struct TriangleGraph
 			std::vector<unsigned int> refined_indices;
 			refined_indices.reserve( sphere_indices.size() * 3);
 
-			for(int i=0; i<sphere_indices.size(); i=i+3)
+			for(int i=0; i<(int)sphere_indices.size(); i=i+3)
 			{
 				unsigned int idx1 = sphere_indices[i];
 				unsigned int idx2 = sphere_indices[i+1];
@@ -2804,7 +2804,7 @@ int main(int argc, char*argv[])
 			//TODO fix labels if TriangleGraph is used
 			labels.draw(camera);
 
-			GeoBoundingBox bbox = camera.computeVisibleArea();
+			// GeoBoundingBox bbox = camera.computeVisibleArea();
 			//std::cout << std::fixed;
 			//std::cout << std::setprecision(20);
 			//std::cout<<"min latitude: "<<bbox.min_latitude<<" max latitude: "<<bbox.max_latitude<<std::endl;
