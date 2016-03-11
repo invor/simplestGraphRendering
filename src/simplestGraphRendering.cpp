@@ -1920,7 +1920,7 @@ struct TextLabels
 												x_max,0.1f,1.0f,1.0f,
 												x_max,-0.1f,1.0f,0.0f }};
 		uint offset = num_labels * 4;
-		std::array< GLuint, 6 > index_array = {{ offset+0,offset+1,offset+2,offset+2,offset+0,offset+3 }};
+		std::array< GLuint, 6 > index_array = {{ offset+0,offset+2,offset+1,offset+2,offset+0,offset+3 }};
 
 		glBindVertexArray(va_handle);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
@@ -2655,7 +2655,6 @@ int main(int argc, char*argv[])
 	/* Intialize controls */
 	glfwSetWindowSizeCallback(window,windowSizeCallback);
 	glfwSetScrollCallback(window, Controls::mouseScrollFeedback);
-	glfwSetMouseButtonCallback(window, Controls::mouseButtonFeedback);
 	/* Hide cursor */
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
@@ -2714,6 +2713,7 @@ int main(int argc, char*argv[])
 		{
 			simpleColouredGraph.loadGraphData(nodes_rgb,edges_rgb,triangles_rgb);
 			Controls::setActiveTriangleGraph(&simpleColouredGraph);
+			glfwSetMouseButtonCallback(window, Controls::mouseButtonFeedback);
 		}
 
 		/* Create polygons */
