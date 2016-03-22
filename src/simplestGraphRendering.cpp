@@ -363,6 +363,7 @@ struct GeoBoundingBox
 	float max_latitude;
 };
 
+
 /**
  * Function to simply read the string of a shader source file from disk
  */
@@ -444,7 +445,7 @@ GLuint createShaderProgram(const char* vs_path, const char* fs_path, std::vector
 	 * The vertices intended to be used with this program will have to match that index in their
 	 * attribute decription, so that a connection between the vertex data and the shader input can be made.
 	 */
-	for(size_t i=0; i<attributes.size(); i++)
+	for(GLuint i=0; i<attributes.size(); i++)
 		glBindAttribLocation(handle, i, attributes[i]);
 
 	/* Read the shader source files */
@@ -684,6 +685,184 @@ namespace ResourceLoader
 		return true;
 	}
 
+}
+
+/*
+ * Collection of functions for parsing files. Taken from lasagne and modified to meet expected graph input format
+ */
+namespace Parser
+{
+	/**
+	 * Creates a new graph node
+	 * @param input_string Input string containing node data
+	 * @param n Nodes vector to put the new node into.
+	 */
+	void createNode(const std::string& input_string, std::vector<Node>& n)
+	{
+		std::string lat, lon;
+
+		std::stringstream ss(input_string);
+		ss >> lat >> lon;
+
+		n.emplace_back(std::stof(lat), std::stof(lon));
+	}
+
+	/**
+	 * createEdge - create a new edge
+	 * @param input_string Input string containing edge data
+	 * @param e Edges vector to put the new edge into.
+	 */
+	void createEdge(const std::string& input_string, std::vector<Edge>& e)
+	{
+		std::string source, target, width, color;
+
+		std::stringstream ss(input_string);
+		ss >> source >> target >> width >> color;
+
+		e.emplace_back(std::stoul(source), std::stoul(target), std::stoul(width), std::stoi(color));
+	}
+
+	/**
+	 * Parse node and egde from input file
+	 * @param graphfile Path to the graphfile
+	 * @param n Vector for storing the parsed nodes
+	 * @param e Vector for storing the parsed edges
+	 */
+	bool parseTxtGraphFile(const std::string& graphfile, std::vector<Node>& n, std::vector<Edge>& e)
+	{
+		std::string buffer;
+		std::ifstream file;
+
+		file.open(graphfile.c_str(), std::ios::in);
+
+		if(file.is_open())
+		{
+			file.seekg(0, std::ios::beg);
+
+			getline(file,buffer,'\n');
+			uint node_count = std::stoul(buffer);
+			getline(file,buffer,'\n');
+			uint edge_count = std::stoul(buffer);
+
+			n.reserve(node_count);
+			for(uint i=0; i<node_count; i++)
+			{
+				getline(file,buffer,'\n');
+				createNode(buffer, n);
+			}
+
+			e.reserve(edge_count);
+			for(uint j=0; j<edge_count; j++)
+			{
+				getline(file,buffer,'\n');
+				createEdge(buffer, e);
+			}
+			file.close();
+
+			return true;
+		}
+
+		return false;
+	}
+
+
+	void createNodeRGB(const std::string& input_string, std::vector<Node_RGB>& n)
+	{
+		std::string lat, lon, r, g, b;
+
+		std::stringstream ss(input_string);
+		ss >> lat >> lon >> r >> g >> b;
+
+		n.emplace_back(std::stof(lat), std::stof(lon), std::stoi(r), std::stoi(g), std::stoi(b));
+	}
+
+	void createEdgeRGB(const std::string& input_string, std::vector<Edge_RGB>& e)
+	{
+		std::string source, target, r, g, b;
+
+		std::stringstream ss(input_string);
+		ss >> source >> target >> r >> g >> b;
+
+		e.emplace_back(std::stoul(source), std::stoul(target), std::stoi(r), std::stoi(g), std::stoi(b));
+	}
+
+	void createTriangleRGB(const std::string& input_string, std::vector<Triangle_RGB>& t)
+	{
+		std::string v1, v2, v3, r, g, b;
+
+		std::stringstream ss(input_string);
+		ss >> v1 >> v2 >> v3 >> r >> g >> b;
+
+		t.emplace_back(std::stoul(v1), std::stoul(v2), std::stoul(v3), std::stoi(r), std::stoi(g), std::stoi(b));
+	}
+
+	bool parseTxtTriangleGraphFile(const std::string& graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e, std::vector<Triangle_RGB>& t)
+	{
+		std::string buffer;
+		std::ifstream file;
+
+		file.open(graphfile.c_str(), std::ios::in);
+
+		if( file.is_open())
+		{
+			file.seekg(0, std::ios::beg);
+
+			getline(file,buffer,'\n');
+			uint node_count = std::stoul(buffer);
+			getline(file,buffer,'\n');
+			uint edge_count = std::stoul(buffer);
+			getline(file,buffer,'\n');
+			uint triangle_count = std::stoul(buffer);
+
+			n.reserve(node_count);
+			for(uint i=0; i<node_count; i++)
+			{
+				getline(file,buffer,'\n');
+				createNodeRGB(buffer, n);
+			}
+
+			e.reserve(edge_count);
+			for(uint j=0; j<edge_count; j++)
+			{
+				getline(file,buffer,'\n');
+				createEdgeRGB(buffer, e);
+			}
+
+			t.reserve(triangle_count);
+			for(uint k=0; k<triangle_count; k++)
+			{
+				getline(file,buffer,'\n');
+				createTriangleRGB(buffer, t);
+			}
+
+			file.close();
+
+			return true;
+		}
+
+		return false;
+	}
+
+	void parseTextureList(const std::string& texture_list_path, std::vector<std::string>& texture_paths)
+	{
+		std::string buffer;
+		std::ifstream file;
+
+		file.open(texture_list_path.c_str(), std::ios::in);
+
+		if( file.is_open())
+		{
+			file.seekg(0, std::ios::beg);
+
+			while(!file.eof())
+			{
+				getline(file,buffer,'\n');
+
+				if( !buffer.empty() && (buffer.compare(0,2,"//") != 0) )
+					texture_paths.push_back(buffer);
+			}
+		}
+	}
 }
 
 /*
@@ -2026,16 +2205,16 @@ struct Polygons
 		// Load polygon shader program
 		prgm_handle = createShaderProgram("../src/polygon_v.glsl","../src/polygon_f.glsl",{"v_position"});
 
-		// Load font atlas
+		// Load fallback background texture
 		unsigned long begin_pos;
 		int x_dim, y_dim;
 		char* img_data;
-		ResourceLoader::readPpmHeader("../resources/background.ppm", begin_pos, x_dim, y_dim);
+		ResourceLoader::readPpmHeader("../resources/notx.ppm", begin_pos, x_dim, y_dim);
 		img_data = new char[x_dim * y_dim * 3];
-		ResourceLoader::readPpmData("../resources/background.ppm", img_data, begin_pos, x_dim, y_dim);
+		ResourceLoader::readPpmData("../resources/notx.ppm", img_data, begin_pos, x_dim, y_dim);
 
-		glGenTextures(1, &background_tx_handle);
-		glBindTexture(GL_TEXTURE_2D, background_tx_handle);
+		glGenTextures(1, &notx_texture_handle);
+		glBindTexture(GL_TEXTURE_2D, notx_texture_handle);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2043,20 +2222,70 @@ struct Polygons
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x_dim, y_dim, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data);
 		glBindTexture(GL_TEXTURE_2D,0);
 
+		delete[] img_data;
+
+		// Load background textures
+		std::vector<std::string> texture_paths;
+		Parser::parseTextureList("../resources/texture_list",texture_paths);
+
+		for(auto& texture_path : texture_paths)
+		{
+			unsigned long begin_pos;
+			int x_dim, y_dim;
+			char* img_data;
+			ResourceLoader::readPpmHeader(("../resources/" + texture_path).c_str(), begin_pos, x_dim, y_dim);
+			img_data = new char[x_dim * y_dim * 3];
+			ResourceLoader::readPpmData(("../resources/" + texture_path).c_str(), img_data, begin_pos, x_dim, y_dim);
+
+			texture_handles.push_back(0);
+
+			glGenTextures(1, &texture_handles.back());
+			glBindTexture(GL_TEXTURE_2D, texture_handles.back());
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x_dim, y_dim, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data);
+			glBindTexture(GL_TEXTURE_2D,0);
+
+			delete[] img_data;
+		}
+
 		index_offsets.push_back(0);
 	}
 
 	Polygons(const Polygons& cpy) = delete;
 
+	~Polygons()
+	{
+		// delete mesh resources
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glDeleteBuffers(1, &ibo_handle);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glDeleteBuffers(1, &vbo_handle);
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &va_handle);
+
+		// delete GLSL program
+		glDeleteProgram(prgm_handle);
+
+		// delete textures
+		for(GLuint tx_handle : texture_handles)
+			glDeleteTextures(1,&tx_handle);
+	}
+
 	/**
 	 * Adds a new polygon on the map froma set of nodes defining the boundary of the polygon.
 	 * Nodes have to be given in counter-clockwise order! Furthermore, the polygon musn't cross the +180°/-180° longitude border.
 	 * \param poly_border A set of nodes in geo coordinates defining the polygon boundary (counter-clockwise order required).
+	 * \param texture_index Index of the texture that should be used for the polygon
 	 */
-	void addPolygon(std::vector<Node> poly_border)
+	void addPolygon(std::vector<Node>& poly_border, int texture_index)
 	{
 		std::vector<Math::Vec2> triangulation_vertices;
 		std::vector<uint> triangulation_indices;
+		uint index_offset = vertices.size()/2.0;
 
 		for(auto& node : poly_border)
 		{
@@ -2067,12 +2296,16 @@ struct Polygons
 
 		triangulation_indices = computeTriangulation(triangulation_vertices);
 
+
 		for(auto& index : triangulation_indices)
 		{
-			indices.push_back(index);
+			indices.push_back(index + index_offset);
 		}
 
 		index_offsets.push_back(triangulation_indices.size()+index_offsets.back());
+
+
+		polygon_texture_idx.push_back(texture_index);
 
 
 		if(vertices.size() < 1 || indices.size() < 1)
@@ -2113,7 +2346,6 @@ struct Polygons
 		glUseProgram(prgm_handle);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D,background_tx_handle);
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(prgm_handle,"background_tx2D"),1,&zero);
 
@@ -2125,6 +2357,12 @@ struct Polygons
 
 		for(size_t i=0; i< index_offsets.size()-1; i++)
 		{
+			int tx_idx = polygon_texture_idx[i];
+			if( tx_idx >= texture_handles.size() || tx_idx < 0 )
+				glBindTexture(GL_TEXTURE_2D, notx_texture_handle);
+			else
+				glBindTexture(GL_TEXTURE_2D, texture_handles[ polygon_texture_idx[i] ]);
+
 			glPointSize(10.0);
 			glDrawElements(GL_TRIANGLES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
 		}
@@ -2147,7 +2385,11 @@ private:
 
 	GLuint prgm_handle;
 
-	GLuint background_tx_handle;
+	GLuint notx_texture_handle;
+
+	std::vector<int> polygon_texture_idx;
+
+	std::vector<GLuint> texture_handles;
 
 	static bool PointsOnSameLineSide(Math::Vec2 p1, Math::Vec2 p2, Math::Vec2 a, Math::Vec2 b)
 	{
@@ -2420,162 +2662,6 @@ namespace Controls {
 
 }
 
-/*
- * Collection of functions for parsing graph files. Taken from lasagne and modified to meet expected graph input format
- */
-namespace Parser
-{
-	/**
-	 * Creates a new graph node
-	 * @param input_string Input string containing node data
-	 * @param n Nodes vector to put the new node into.
-	 */
-	void createNode(const std::string& input_string, std::vector<Node>& n)
-	{
-		std::string lat, lon;
-
-		std::stringstream ss(input_string);
-		ss >> lat >> lon;
-
-		n.emplace_back(std::stof(lat), std::stof(lon));
-	}
-
-	/**
-	 * createEdge - create a new edge
-	 * @param input_string Input string containing edge data
-	 * @param e Edges vector to put the new edge into.
-	 */
-	void createEdge(const std::string& input_string, std::vector<Edge>& e)
-	{
-		std::string source, target, width, color;
-
-		std::stringstream ss(input_string);
-		ss >> source >> target >> width >> color;
-
-		e.emplace_back(std::stoul(source), std::stoul(target), std::stoul(width), std::stoi(color));
-	}
-
-	/**
-	 * Parse node and egde from input file
-	 * @param graphfile Path to the graphfile
-	 * @param n Vector for storing the parsed nodes
-	 * @param e Vector for storing the parsed edges
-	 */
-	bool parseTxtGraphFile(const std::string& graphfile, std::vector<Node>& n, std::vector<Edge>& e)
-	{
-		std::string buffer;
-		std::ifstream file;
-
-		file.open(graphfile.c_str(), std::ios::in);
-
-		if(file.is_open())
-		{
-			file.seekg(0, std::ios::beg);
-
-			getline(file,buffer,'\n');
-			uint node_count = std::stoul(buffer);
-			getline(file,buffer,'\n');
-			uint edge_count = std::stoul(buffer);
-
-			n.reserve(node_count);
-			for(uint i=0; i<node_count; i++)
-			{
-				getline(file,buffer,'\n');
-				createNode(buffer, n);
-			}
-
-			e.reserve(edge_count);
-			for(uint j=0; j<edge_count; j++)
-			{
-				getline(file,buffer,'\n');
-				createEdge(buffer, e);
-			}
-			file.close();
-
-			return true;
-		}
-
-		return false;
-	}
-
-
-	void createNodeRGB(const std::string& input_string, std::vector<Node_RGB>& n)
-	{
-		std::string lat, lon, r, g, b;
-
-		std::stringstream ss(input_string);
-		ss >> lat >> lon >> r >> g >> b;
-
-		n.emplace_back(std::stof(lat), std::stof(lon), std::stoi(r), std::stoi(g), std::stoi(b));
-	}
-
-	void createEdgeRGB(const std::string& input_string, std::vector<Edge_RGB>& e)
-	{
-		std::string source, target, r, g, b;
-
-		std::stringstream ss(input_string);
-		ss >> source >> target >> r >> g >> b;
-
-		e.emplace_back(std::stoul(source), std::stoul(target), std::stoi(r), std::stoi(g), std::stoi(b));
-	}
-
-	void createTriangleRGB(const std::string& input_string, std::vector<Triangle_RGB>& t)
-	{
-		std::string v1, v2, v3, r, g, b;
-
-		std::stringstream ss(input_string);
-		ss >> v1 >> v2 >> v3 >> r >> g >> b;
-
-		t.emplace_back(std::stoul(v1), std::stoul(v2), std::stoul(v3), std::stoi(r), std::stoi(g), std::stoi(b));
-	}
-
-	bool parseTxtTriangleGraphFile(const std::string& graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e, std::vector<Triangle_RGB>& t)
-	{
-		std::string buffer;
-		std::ifstream file;
-
-		file.open(graphfile.c_str(), std::ios::in);
-
-		if( file.is_open())
-		{
-			file.seekg(0, std::ios::beg);
-
-			getline(file,buffer,'\n');
-			uint node_count = std::stoul(buffer);
-			getline(file,buffer,'\n');
-			uint edge_count = std::stoul(buffer);
-			getline(file,buffer,'\n');
-			uint triangle_count = std::stoul(buffer);
-
-			n.reserve(node_count);
-			for(uint i=0; i<node_count; i++)
-			{
-				getline(file,buffer,'\n');
-				createNodeRGB(buffer, n);
-			}
-
-			e.reserve(edge_count);
-			for(uint j=0; j<edge_count; j++)
-			{
-				getline(file,buffer,'\n');
-				createEdgeRGB(buffer, e);
-			}
-
-			t.reserve(triangle_count);
-			for(uint k=0; k<triangle_count; k++)
-			{
-				getline(file,buffer,'\n');
-				createTriangleRGB(buffer, t);
-			}
-
-			file.close();
-
-			return true;
-		}
-
-		return false;
-	}
-}
 
 int main(int argc, char*argv[])
 {
@@ -2716,9 +2802,11 @@ int main(int argc, char*argv[])
 			glfwSetMouseButtonCallback(window, Controls::mouseButtonFeedback);
 		}
 
-		/* Create polygons */
+		/* Example for creating polygons */
 		Polygons polys;
-		polys.addPolygon({Node(50.0,5.0),Node(43.0,3.2),Node(40.0,5.0),Node(40.0,10.0),Node(45.0,15.0),Node(50.0,10.0)});
+		polys.addPolygon(std::vector<Node>({Node(50.0,5.0),Node(43.0,3.2),Node(40.0,5.0),Node(40.0,10.0),Node(45.0,15.0),Node(50.0,10.0)}), 0);
+		polys.addPolygon(std::vector<Node>({Node(50.0,10.0),Node(45.0,15.0),Node(48.0,17.5)}), 2);
+		polys.addPolygon(std::vector<Node>({Node(50.0,20.0),Node(45.0,25.0),Node(48.0,27.0)}), 1);
 
 		/* Create a orbital camera */
 		OrbitalCamera camera;
@@ -2766,8 +2854,8 @@ int main(int argc, char*argv[])
 		{
 			Controls::updateOrbitalCamera(window);
 
-			// update near/far clipping plane based on camera orbit
-			camera.near = 0.001f * camera.orbit;
+			/* update near/far clipping plane based on camera orbit */
+			camera.near = 0.0001f * camera.orbit;
 			camera.far = 2.0f * camera.orbit;
 			camera.updateProjectionMatrix();
 
@@ -2801,7 +2889,6 @@ int main(int argc, char*argv[])
 			glViewport(0, 0, width, height);
 
 			/* Draw labels */
-			//TODO fix labels if TriangleGraph is used
 			labels.draw(camera);
 
 			// GeoBoundingBox bbox = camera.computeVisibleArea();

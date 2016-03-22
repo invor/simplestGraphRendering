@@ -1,0 +1,6 @@
+// List of background textures for polygons
+// Paths are relative to the resources folder.
+// Use power of two textures larger or equal to 4x4.
+background_01.ppm
+background_02.ppm
+background_03.ppm
