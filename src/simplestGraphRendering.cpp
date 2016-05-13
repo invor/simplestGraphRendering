@@ -2359,7 +2359,7 @@ struct Polygons
 		for(size_t i=0; i< index_offsets.size()-1; i++)
 		{
 			int tx_idx = polygon_texture_idx[i];
-			if( tx_idx >= texture_handles.size() || tx_idx < 0 )
+			if( tx_idx >= (int)texture_handles.size() || tx_idx < 0 )
 				glBindTexture(GL_TEXTURE_2D, notx_texture_handle);
 			else
 				glBindTexture(GL_TEXTURE_2D, texture_handles[ polygon_texture_idx[i] ]);
