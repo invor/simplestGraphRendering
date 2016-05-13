@@ -1,6 +1,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <cmath>
 #include <array>
 #include <vector>
 #include <fstream>
@@ -2281,7 +2282,7 @@ struct Polygons
 	 * \param poly_border A set of nodes in geo coordinates defining the polygon boundary (counter-clockwise order required).
 	 * \param texture_index Index of the texture that should be used for the polygon
 	 */
-	void addPolygon(std::vector<Node>& poly_border, int texture_index)
+	void addPolygon(const std::vector<Node>& poly_border, int texture_index)
 	{
 		std::vector<Math::Vec2> triangulation_vertices;
 		std::vector<uint> triangulation_indices;
