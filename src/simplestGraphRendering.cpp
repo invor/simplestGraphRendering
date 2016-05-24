@@ -2204,7 +2204,7 @@ struct Polygons
 	Polygons()
 	{
 		// Load polygon shader program
-		prgm_handle = createShaderProgram("../src/polygon_v.glsl","../src/polygon_f.glsl",{"v_position"});
+		prgm_handle = createShaderProgram("../src/polygon_v.glsl","../src/polygon_f.glsl",{"v_geoCoords"});
 
 		// Load fallback background texture
 		unsigned long begin_pos;
@@ -2279,6 +2279,7 @@ struct Polygons
 	/**
 	 * Adds a new polygon on the map froma set of nodes defining the boundary of the polygon.
 	 * Nodes have to be given in counter-clockwise order! Furthermore, the polygon musn't cross the +180°/-180° longitude border.
+	 * Furthermore, the polygon is automatically closed using the first and last node.
 	 * \param poly_border A set of nodes in geo coordinates defining the polygon boundary (counter-clockwise order required).
 	 * \param texture_index Index of the texture that should be used for the polygon
 	 */
@@ -2808,6 +2809,7 @@ int main(int argc, char*argv[])
 		polys.addPolygon(std::vector<Node>({Node(50.0,5.0),Node(43.0,3.2),Node(40.0,5.0),Node(40.0,10.0),Node(45.0,15.0),Node(50.0,10.0)}), 0);
 		polys.addPolygon(std::vector<Node>({Node(50.0,10.0),Node(45.0,15.0),Node(48.0,17.5)}), 2);
 		polys.addPolygon(std::vector<Node>({Node(50.0,20.0),Node(45.0,25.0),Node(48.0,27.0)}), 1);
+		polys.addPolygon(std::vector<Node>({Node( 90,-135 ), Node ( 0, -180 ), Node (0, -90 )/*, Node( 90,-135 )*/}), 2);
 
 		/* Create a orbital camera */
 		OrbitalCamera camera;
