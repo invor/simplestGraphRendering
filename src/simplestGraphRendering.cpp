@@ -2313,7 +2313,7 @@ struct Polygons
 		if(vertices.size() < 1 || indices.size() < 1)
 			return;
 
-		auto va_size = sizeof(float) * 2 * vertices.size();
+		auto va_size = sizeof(float) * vertices.size();
 		auto vi_size = sizeof(uint) * indices.size();
 
 		if(va_handle == 0 || vbo_handle == 0 || ibo_handle == 0)
@@ -2365,7 +2365,7 @@ struct Polygons
 			else
 				glBindTexture(GL_TEXTURE_2D, texture_handles[ polygon_texture_idx[i] ]);
 
-			glPointSize(10.0);
+			//glPointSize(10.0);
 			glDrawElements(GL_TRIANGLES,  index_offsets[i+1]-index_offsets[i],  GL_UNSIGNED_INT,  (void*)(index_offsets[i] * sizeof(GLuint)) );
 		}
 	}
