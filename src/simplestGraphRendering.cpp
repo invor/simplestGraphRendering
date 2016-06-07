@@ -1,6 +1,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <assert.h>
 #include <cmath>
 #include <array>
 #include <vector>
@@ -384,8 +385,6 @@ struct GeoBoundingBox
 };
 
 namespace Controls {
-
-	float gTime = 0.0; ///< behold the evil global(-variable) time
 	int collisionSphere_mode = 0;
 }
 
@@ -1149,7 +1148,7 @@ struct IcoSphere
 													6,1,10,	9,0,11,	9,11,2,	9,2,5,	7,2,11 });
 
 		// Subdivide icosahedron
-		for(int subdivs=0; subdivs<subdivision; subdivs++)
+		for(uint subdivs=0; subdivs<subdivision; subdivs++)
 		{
 			std::vector<unsigned int> refined_indices;
 			refined_indices.reserve( sphere_indices.size() * 3);
@@ -2030,7 +2029,7 @@ struct TriangleGraph
 struct CollisionSpheres
 {
 	CollisionSpheres()
-		: ss_mesh(7), cs_mesh(4), data_texture_handle(0), grow_factor(0.0), start_idx(0)
+		: ss_mesh(6), cs_mesh(3), data_texture_handle(0), grow_factor(0.0), current_timestep(0)
 	{
 		// Create shader progams
 		ss_prgm_handle = createShaderProgram("../src/surface_sphere_v.glsl","../src/surface_sphere_f.glsl",{"v_position"});
@@ -2042,7 +2041,9 @@ struct CollisionSpheres
 	std::vector<CollisionSphere> collision_sphere_data;
 	uint sphere_cnt;
 	float grow_factor;
-	uint start_idx;
+
+	uint current_timestep;
+	float time;
 
 	GLuint ss_prgm_handle;			///< Surface sphere program handle
 	GLuint cs_prgm_handle;			///< Collision spheres program handle
@@ -2067,6 +2068,13 @@ struct CollisionSpheres
 							lat_cos * lon_cos * r );
 	}
 
+	void moveTimestep(int direction)
+	{
+		current_timestep = std::max(0u, std::min(current_timestep+direction,sphere_cnt));
+
+		time = collision_sphere_data[current_timestep].collision_time;
+	}
+
 	void loadData(std::vector<CollisionSphere>& spheres, std::map<uint,uint>& id_map)
 	{
 		// Copy data
@@ -2075,16 +2083,19 @@ struct CollisionSpheres
 		sphere_cnt = spheres.size() - 4;
 
 		// Extract information from collision sphere and store in texture for rendering
-		std::vector<float> tx_data;
-		tx_data.reserve( sphere_cnt * 4);
+		uint tx_height = std::ceil( static_cast<float>(sphere_cnt) / 8096.0f );
+		std::vector<float> tx_data(8096*tx_height*4,0.0f);
 
 		for(uint i=0; i<sphere_cnt; i++)
 		{
-			tx_data.push_back(spheres[i].lat);
-			tx_data.push_back(spheres[i].lon);
+			tx_data[i*4 + 0] = (spheres[i].lat);
+			tx_data[i*4 + 1] = (spheres[i].lon);
 
 			// approximate radius in 3d space
-			uint q_idx = id_map.find(spheres[i].collision_partner_id)->second;
+			auto search = id_map.find(spheres[i].collision_partner_id);
+			assert(search != id_map.end());
+			uint q_idx = search->second;
+			assert(q_idx < spheres.size());
 
 			Math::Vec3 p = geoToCartesian(spheres[i].lon,spheres[i].lat);
 			Math::Vec3 q = geoToCartesian(spheres[q_idx].lon,spheres[q_idx].lat);
@@ -2094,27 +2105,32 @@ struct CollisionSpheres
 
 			float d = (p-q).length();
 
+			// filtering results that seem impossible (a quick hack)
+			d = (d>2.0) ? 0.0 : d;
+
 			float radius = d * (rp/(rp+rq));
 
-			tx_data.push_back(radius);
+			tx_data[i*4 + 2] = (radius);
 
-			tx_data.push_back(spheres[i].collision_time);
+			tx_data[i*4 + 3] = (spheres[i].collision_time);
 		}
 
-		uint tx_height = std::ceil( static_cast<double>(spheres.size()) / 8096.0 );
-
+		std::cout<<"Tx height: "<<tx_height<<std::endl;
+		std::cout<<"Tx data size: "<<tx_data.size()<<std::endl;
+		
 		if(data_texture_handle == 0)
 			glGenTextures(1, &data_texture_handle);
 		glBindTexture(GL_TEXTURE_2D, data_texture_handle);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 8096, tx_height, 0, GL_RGBA, GL_FLOAT, tx_data.data());
 		glBindTexture(GL_TEXTURE_2D,0);
+		
 	}
 
-	void draw(OrbitalCamera& camera, double t)
+	void draw(OrbitalCamera& camera)
 	{
 		glCullFace(GL_FRONT);
 		glEnable(GL_DEPTH_TEST);
@@ -2136,20 +2152,14 @@ struct CollisionSpheres
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "data_tx2D"),1,&zero);
 
-		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "time"),1,  &Controls::gTime);
+		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "time"),1,  &time);
 		float zpo = 0.0001;
 		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "grow_factor"),1,  &zpo);
 		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "mode"),1, &Controls::collisionSphere_mode);
 
-		// move start index if time is greater or less than equal the currents start point (hack version...moves only a single sphere per frame)
-		if(collision_sphere_data[start_idx].collision_time < Controls::gTime)
-			start_idx++;
-		else if( start_idx > 0 && collision_sphere_data[start_idx-1].collision_time > Controls::gTime)
-			start_idx--;
+		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "id_offset"),1,&current_timestep);
 
-		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "id_offset"),1,&start_idx);
-
-		cs_mesh.draw(sphere_cnt-start_idx);
+		cs_mesh.draw(sphere_cnt-current_timestep);
 		glCullFace(GL_BACK);
 		glDisable(GL_DEPTH_TEST);
 	}
@@ -2503,7 +2513,7 @@ struct Polygons
 	{
 		std::vector<Math::Vec2> triangulation_vertices;
 		std::vector<uint> triangulation_indices;
-		uint index_offset = vertices.size()/2.0;
+		uint index_offset = static_cast<uint>(vertices.size()/2.0f);
 
 		for(auto& node : poly_border)
 		{
@@ -2520,7 +2530,7 @@ struct Polygons
 			indices.push_back(index + index_offset);
 		}
 
-		index_offsets.push_back(triangulation_indices.size()+index_offsets.back());
+		index_offsets.push_back(static_cast<uint>(triangulation_indices.size())+index_offsets.back());
 
 
 		polygon_texture_idx.push_back(texture_index);
@@ -2810,15 +2820,18 @@ namespace Controls {
 		std::array<float,2> latest_cursor_position = {{0.0,0.0}};
 
 		TriangleGraph* active_triangleGraph;
+
+		CollisionSpheres* active_collisionSpheres = nullptr;
 	}
 
 	void mouseScrollFeedback(GLFWwindow *window, double x_offset, double y_offset)
 	{
 		if (glfwGetKey(window,GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
 		{
-			gTime = std::max(0.0f, gTime + 1000.0f * static_cast<float>(y_offset));
+			if(active_collisionSpheres != nullptr)
+				active_collisionSpheres->moveTimestep( 1-2*std::signbit(y_offset) );
 
-			std::cout<<"Time: "<<gTime<<std::endl;
+			std::cout<<"Time: "<<active_collisionSpheres->time<<std::endl;
 		}
 		else
 		{
@@ -2900,6 +2913,10 @@ namespace Controls {
 		active_triangleGraph = g;
 	}
 
+	void setActiveCollisionSpheres(CollisionSpheres* cs)
+	{
+		active_collisionSpheres = cs;
+	}
 }
 
 
@@ -3056,6 +3073,7 @@ int main(int argc, char*argv[])
 		if(raw)
 		{
 			collisionSpheres.loadData(cSpheres,idMap);
+			Controls::setActiveCollisionSpheres(&collisionSpheres);
 		}
 
 		/* Example for creating polygons */
@@ -3142,7 +3160,7 @@ int main(int argc, char*argv[])
 			}
 			else if(raw)
 			{
-				collisionSpheres.draw(camera,Controls::gTime);
+				collisionSpheres.draw(camera);
 			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
