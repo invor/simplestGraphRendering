@@ -10,6 +10,7 @@ uniform sampler2D data_tx2D;
 uniform float time;
 uniform float grow_factor;
 uniform uint id_offset;
+uniform int mode;
 
 in vec3 v_position;
 
@@ -35,11 +36,17 @@ void main()
 	//float r = 1.0; //6378137.0;
     float r = 1.001; //6378137.0;
 	
-	vec3 world_position = vec3( lon_sin * lat_cos * r,
+	vec3 sphere_center = vec3( lon_sin * lat_cos * r,
 								lat_sin * r,
 								lat_cos * lon_cos * r );
 	
     
     vec3 sphere = v_position * radius * (time/collision_time);
-    gl_Position = projection_matrix * view_matrix * vec4(world_position + sphere,1.0);
+
+    vec3 position = sphere_center + sphere;
+
+    if( length(position) >= 1.0 && mode == 1)
+        position = normalize(position) * 1.005;
+
+    gl_Position = projection_matrix * view_matrix * vec4(position,1.0);
 }

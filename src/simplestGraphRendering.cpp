@@ -386,6 +386,7 @@ struct GeoBoundingBox
 namespace Controls {
 
 	float gTime = 0.0; ///< behold the evil global(-variable) time
+	int collisionSphere_mode = 0;
 }
 
 /**
@@ -894,7 +895,7 @@ namespace Parser
 			uint sphere_count = std::stoul(buffer);
 
 			s.reserve(sphere_count);
-			for(uint i=0; i<sphere_count-4; i++)
+			for(uint i=0; i<sphere_count; i++)
 			{
 				getline(file,buffer,'\n');
 				createCollisionSphere(buffer, s, id_map);
@@ -2029,7 +2030,7 @@ struct TriangleGraph
 struct CollisionSpheres
 {
 	CollisionSpheres()
-		: ss_mesh(5), cs_mesh(2), data_texture_handle(0), grow_factor(0.0), start_idx(0)
+		: ss_mesh(7), cs_mesh(4), data_texture_handle(0), grow_factor(0.0), start_idx(0)
 	{
 		// Create shader progams
 		ss_prgm_handle = createShaderProgram("../src/surface_sphere_v.glsl","../src/surface_sphere_f.glsl",{"v_position"});
@@ -2071,29 +2072,34 @@ struct CollisionSpheres
 		// Copy data
 		collision_sphere_data = spheres;
 
+		sphere_cnt = spheres.size() - 4;
+
 		// Extract information from collision sphere and store in texture for rendering
 		std::vector<float> tx_data;
-		tx_data.reserve(spheres.size() * 4);
+		tx_data.reserve( sphere_cnt * 4);
 
-		for(auto& cSphere : spheres)
+		for(uint i=0; i<sphere_cnt; i++)
 		{
-			tx_data.push_back(cSphere.lat);
-			tx_data.push_back(cSphere.lon);
+			tx_data.push_back(spheres[i].lat);
+			tx_data.push_back(spheres[i].lon);
 
-			// compute radius
-			uint q_id = id_map.find(cSphere.collision_partner_id)->second;
-			Math::Vec3 p = geoToCartesian(cSphere.lon,cSphere.lat);
-			Math::Vec3 q = geoToCartesian(spheres[q_id].lon,spheres[q_id].lat);
+			// approximate radius in 3d space
+			uint q_idx = id_map.find(spheres[i].collision_partner_id)->second;
+
+			Math::Vec3 p = geoToCartesian(spheres[i].lon,spheres[i].lat);
+			Math::Vec3 q = geoToCartesian(spheres[q_idx].lon,spheres[q_idx].lat);
+			double ct = spheres[i].collision_time;
+			double rp = spheres[i].radius;
+			double rq = spheres[q_idx].radius;
+
 			float d = (p-q).length();
-			tx_data.push_back(d/2.0);
 
-			tx_data.push_back(cSphere.collision_time);
+			float radius = d * (rp/(rp+rq));
+
+			tx_data.push_back(radius);
+
+			tx_data.push_back(spheres[i].collision_time);
 		}
-
-		// Compute grow factor from first collision
-
-
-		sphere_cnt = spheres.size();
 
 		uint tx_height = std::ceil( static_cast<double>(spheres.size()) / 8096.0 );
 
@@ -2133,6 +2139,7 @@ struct CollisionSpheres
 		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "time"),1,  &Controls::gTime);
 		float zpo = 0.0001;
 		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "grow_factor"),1,  &zpo);
+		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "mode"),1, &Controls::collisionSphere_mode);
 
 		// move start index if time is greater or less than equal the currents start point (hack version...moves only a single sphere per frame)
 		if(collision_sphere_data[start_idx].collision_time < Controls::gTime)
@@ -2810,6 +2817,8 @@ namespace Controls {
 		if (glfwGetKey(window,GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
 		{
 			gTime = std::max(0.0f, gTime + 1000.0f * static_cast<float>(y_offset));
+
+			std::cout<<"Time: "<<gTime<<std::endl;
 		}
 		else
 		{
@@ -2855,6 +2864,9 @@ namespace Controls {
 			case GLFW_KEY_ESCAPE:
 				glfwSetWindowShouldClose(window,true);
 				break;
+			case GLFW_KEY_C:
+				if(action == GLFW_PRESS)
+					collisionSphere_mode = (collisionSphere_mode==0) ? 1 : 0;
 			default:
 				break;
 			}
