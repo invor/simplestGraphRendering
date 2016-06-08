@@ -2029,7 +2029,7 @@ struct TriangleGraph
 struct CollisionSpheres
 {
 	CollisionSpheres()
-		: ss_mesh(6), cs_mesh(3), data_texture_handle(0), grow_factor(0.0), current_timestep(0)
+		: ss_mesh(6), cs_mesh(3), data_texture_handle(0), priority_texture_handle(0), grow_factor(0.0), highest_priority(0), current_timestep(0)
 	{
 		// Create shader progams
 		ss_prgm_handle = createShaderProgram("../src/surface_sphere_v.glsl","../src/surface_sphere_f.glsl",{"v_position"});
@@ -2041,6 +2041,7 @@ struct CollisionSpheres
 	std::vector<CollisionSphere> collision_sphere_data;
 	uint sphere_cnt;
 	float grow_factor;
+	uint highest_priority;
 
 	uint current_timestep;
 	float time;
@@ -2048,6 +2049,7 @@ struct CollisionSpheres
 	GLuint ss_prgm_handle;			///< Surface sphere program handle
 	GLuint cs_prgm_handle;			///< Collision spheres program handle
 	GLuint data_texture_handle;		///< Collision spheres data texture handle
+	GLuint priority_texture_handle; ///< Additional collision spheres data texture handle
 
 	IcoSphere ss_mesh;				///< Surface sphere mesh
 	IcoSphere cs_mesh;				///< Collision spheres mesh
@@ -2070,7 +2072,8 @@ struct CollisionSpheres
 
 	void moveTimestep(int direction)
 	{
-		current_timestep = std::max(0u, std::min(current_timestep+direction,sphere_cnt));
+
+		current_timestep = (static_cast<int>(current_timestep)+direction < 0) ? 0u : std::min(current_timestep+direction,sphere_cnt);
 
 		time = collision_sphere_data[current_timestep].collision_time;
 	}
@@ -2085,6 +2088,7 @@ struct CollisionSpheres
 		// Extract information from collision sphere and store in texture for rendering
 		uint tx_height = std::ceil( static_cast<float>(sphere_cnt) / 8096.0f );
 		std::vector<float> tx_data(8096*tx_height*4,0.0f);
+		std::vector<float> prio_tx_data(8096*tx_height,0.0f);
 
 		for(uint i=0; i<sphere_cnt; i++)
 		{
@@ -2113,11 +2117,11 @@ struct CollisionSpheres
 			tx_data[i*4 + 2] = (radius);
 
 			tx_data[i*4 + 3] = (spheres[i].collision_time);
+			
+			prio_tx_data[i] = static_cast<float>(spheres[i].priority);
+			highest_priority = std::max(highest_priority,spheres[i].priority);
 		}
 
-		std::cout<<"Tx height: "<<tx_height<<std::endl;
-		std::cout<<"Tx data size: "<<tx_data.size()<<std::endl;
-		
 		if(data_texture_handle == 0)
 			glGenTextures(1, &data_texture_handle);
 		glBindTexture(GL_TEXTURE_2D, data_texture_handle);
@@ -2126,6 +2130,16 @@ struct CollisionSpheres
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 8096, tx_height, 0, GL_RGBA, GL_FLOAT, tx_data.data());
+		glBindTexture(GL_TEXTURE_2D,0);
+
+		if(priority_texture_handle == 0)
+			glGenTextures(1, &priority_texture_handle);
+		glBindTexture(GL_TEXTURE_2D, priority_texture_handle);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, 8096, tx_height, 0, GL_RED, GL_FLOAT, prio_tx_data.data());
 		glBindTexture(GL_TEXTURE_2D,0);
 		
 	}
@@ -2152,12 +2166,19 @@ struct CollisionSpheres
 		int zero = 0;
 		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "data_tx2D"),1,&zero);
 
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, priority_texture_handle);
+		int one = 1;
+		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "priority_data_tx2D"),1,&one);
+
 		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "time"),1,  &time);
 		float zpo = 0.0001;
 		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "grow_factor"),1,  &zpo);
 		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "mode"),1, &Controls::collisionSphere_mode);
 
 		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "id_offset"),1,&current_timestep);
+
+		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "highest_priority"),1,&highest_priority);
 
 		cs_mesh.draw(sphere_cnt-current_timestep);
 		glCullFace(GL_BACK);
@@ -2828,8 +2849,15 @@ namespace Controls {
 	{
 		if (glfwGetKey(window,GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
 		{
+			//if(active_collisionSpheres != nullptr)
+				//active_collisionSpheres->moveTimestep( 1-2*std::signbit(y_offset) );
+				//active_collisionSpheres->moveTimestep(int((active_collisionSpheres->sphere_cnt)*0.01)*(1-2*std::signbit(y_offset)) );
+
 			if(active_collisionSpheres != nullptr)
-				active_collisionSpheres->moveTimestep( 1-2*std::signbit(y_offset) );
+			{
+				int dist_up=active_collisionSpheres->sphere_cnt-active_collisionSpheres->current_timestep;
+				active_collisionSpheres->moveTimestep(int((dist_up)*0.02+1)*(1-2*std::signbit(y_offset)) );
+			}
 
 			std::cout<<"Time: "<<active_collisionSpheres->time<<std::endl;
 		}
@@ -3130,7 +3158,7 @@ int main(int argc, char*argv[])
 			Controls::updateOrbitalCamera(window);
 
 			/* update near/far clipping plane based on camera orbit */
-			camera.near = 0.0001f * camera.orbit;
+			camera.near = 0.0001f * pow(camera.orbit,2.0f);
 			camera.far = 2.0f * camera.orbit;
 			camera.updateProjectionMatrix();
 

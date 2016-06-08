@@ -14,14 +14,17 @@ uniform int mode;
 
 in vec3 v_position;
 
+flat out ivec2 data_idx;
 out float collision_time;
+out float distance_to_center;
+out float current_radius;
 
 void main()
 {
     int id = gl_InstanceID + int(id_offset);
     int x_idx = id - int(floor(id/8096.0) * 8096);
     int y_idx = int(floor(id/8096.0));
-    ivec2 data_idx = ivec2(x_idx,y_idx);
+    data_idx = ivec2(x_idx,y_idx);
     vec4 sphere_data = texelFetch(data_tx2D,data_idx,0);
     vec2 v_geoCoords = vec2(sphere_data.y,sphere_data.x);
     float radius = sphere_data.z;
@@ -41,11 +44,19 @@ void main()
 	
     
     vec3 sphere = v_position * radius * (time/collision_time);
+    current_radius = radius * (time/collision_time);
 
     vec3 position = sphere_center + sphere;
 
     if( length(position) >= 1.0 && mode == 1)
-        position = normalize(position) * 1.005;
+    {
+        position = normalize(position) * (1.001 + (0.005 * radius * (time/collision_time)));
+        distance_to_center = length(position-sphere_center);
+    }
+    else
+    {
+        distance_to_center = dot(normalize(sphere),normalize(sphere_center));
+    }
 
     gl_Position = projection_matrix * view_matrix * vec4(position,1.0);
 }
