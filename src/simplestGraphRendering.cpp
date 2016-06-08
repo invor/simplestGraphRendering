@@ -875,8 +875,8 @@ namespace Parser
 		std::stringstream ss(input_string);
 		ss >> id >> lat >> lon >> rad >> prio >> ct >> cpId;
 
-		id_map.insert(std::pair<uint,uint>(std::stoi(id),s.size()));
-		s.emplace_back(std::stoi(id), std::stof(lat), std::stof(lon), std::stof(rad), std::stoi(prio), std::stof(ct), std::stoi(cpId));
+		id_map.insert(std::pair<uint,uint>(std::stoul(id),s.size()));
+		s.emplace_back(std::stoul(id), std::stod(lat), std::stod(lon), std::stod(rad), std::stoul(prio), std::stod(ct), std::stoul(cpId));
 	}
 
 	bool parseTxtCollisionSpheresFile(const std::string& filename, std::vector<CollisionSphere>& s, std::map<uint,uint>& id_map)
