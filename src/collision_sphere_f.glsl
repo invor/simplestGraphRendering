@@ -5,8 +5,10 @@ uniform sampler2D priority_data_tx2D;
 uniform float time;
 uniform int mode;
 uniform uint highest_priority;
+uniform uint show_elimination_idx;
 
 flat in ivec2 data_idx;
+flat in int instance_id;
 in float collision_time;
 in float distance_to_center;
 in float current_radius;
@@ -27,12 +29,12 @@ void main()
 
     if(mode == 0)
     {
-        if(distance_to_center < (time/collision_time))
+        if( (distance_to_center < (time/collision_time)) && (uint(instance_id) > show_elimination_idx) )
             frag_colour = vec4(0.0,0.0,0.0,1.0);
     }
     else
     {
-        if(distance_to_center < (time/collision_time)*current_radius)
+        if( (distance_to_center < (time/collision_time)*current_radius) && (uint(instance_id) > show_elimination_idx) )
             frag_colour = vec4(0.0,0.0,0.0,1.0);
     }
 }

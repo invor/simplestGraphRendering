@@ -15,12 +15,14 @@ uniform int mode;
 in vec3 v_position;
 
 flat out ivec2 data_idx;
+flat out int instance_id;
 out float collision_time;
 out float distance_to_center;
 out float current_radius;
 
 void main()
 {
+    instance_id = gl_InstanceID;
     int id = gl_InstanceID + int(id_offset);
     int x_idx = id - int(floor(id/8096.0) * 8096);
     int y_idx = int(floor(id/8096.0));

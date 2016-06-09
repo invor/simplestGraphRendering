@@ -2029,7 +2029,7 @@ struct TriangleGraph
 struct CollisionSpheres
 {
 	CollisionSpheres()
-		: ss_mesh(6), cs_mesh(3), data_texture_handle(0), priority_texture_handle(0), grow_factor(0.0), highest_priority(0), current_timestep(0)
+		: ss_mesh(6), cs_mesh(3), data_texture_handle(0), priority_texture_handle(0), grow_factor(0.0), highest_priority(0), show_eliminations_factor(0.0f), current_timestep(0)
 	{
 		// Create shader progams
 		ss_prgm_handle = createShaderProgram("../src/surface_sphere_v.glsl","../src/surface_sphere_f.glsl",{"v_position"});
@@ -2042,6 +2042,7 @@ struct CollisionSpheres
 	uint sphere_cnt;
 	float grow_factor;
 	uint highest_priority;
+	float show_eliminations_factor;
 
 	uint current_timestep;
 	float time;
@@ -2108,7 +2109,6 @@ struct CollisionSpheres
 
 			Math::Vec3 p = geoToCartesian(spheres[i].lon,spheres[i].lat);
 			Math::Vec3 q = geoToCartesian(spheres[q_idx].lon,spheres[q_idx].lat);
-			double ct = spheres[i].collision_time;
 			double rp = spheres[i].radius;
 			double rq = spheres[q_idx].radius;
 
@@ -2118,7 +2118,6 @@ struct CollisionSpheres
 
 			tx_data[i*4 + 2] = (radius);
 			tx_data[i*4 + 3] = (spheres[i].collision_time);
-			
 
 			min_priority = std::min(min_priority,static_cast<float>(spheres[i].priority));
 			prio_tx_data[i*2 +0] = static_cast<float>(spheres[i].priority);
@@ -2180,12 +2179,14 @@ struct CollisionSpheres
 		float zpo = 0.0001;
 		glUniform1fv(glGetUniformLocation(cs_prgm_handle, "grow_factor"),1,  &zpo);
 		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "mode"),1, &Controls::collisionSphere_mode);
-
 		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "id_offset"),1,&current_timestep);
-
 		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "highest_priority"),1,&highest_priority);
 
-		cs_mesh.draw(sphere_cnt-current_timestep);
+		uint remaining_sphere_cnt = sphere_cnt-current_timestep;
+		uint show_elimination_idx = remaining_sphere_cnt*show_eliminations_factor;
+		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "show_elimination_idx"),1,  &show_elimination_idx);
+
+		cs_mesh.draw(remaining_sphere_cnt);
 		glCullFace(GL_BACK);
 		glDisable(GL_DEPTH_TEST);
 	}
@@ -2961,6 +2962,7 @@ int main(int argc, char*argv[])
 
 	std::string filepath;
 	float trianlge_transparency = 1.0f;
+	float etd = 0.0f;
 
 	int i=1;
     if (argc < 3) {
@@ -2979,6 +2981,12 @@ int main(int argc, char*argv[])
 			i++;
 			if(i<argc && argv[i][0] != '-') { trianlge_transparency = std::stof(argv[i]); i++; }
 			else { std::cout<<"Missing parameter for -t"<<std::endl; return 0; }
+		}
+		else if(argv[i] == (std::string) "-x")
+		{
+			i++;
+			if(i<argc && argv[i][0] != '-') { etd = std::stof(argv[i]); i++; }
+			else { std::cout<<"Missing parameter for -x"<<std::endl; return 0; }
 		}
 		else
 		{
@@ -3194,6 +3202,7 @@ int main(int argc, char*argv[])
 			else if(raw)
 			{
 				collisionSpheres.draw(camera);
+				collisionSpheres.show_eliminations_factor = etd;
 			}
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
