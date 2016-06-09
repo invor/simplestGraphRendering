@@ -5,7 +5,7 @@ uniform sampler2D priority_data_tx2D;
 uniform float time;
 uniform int mode;
 uniform uint highest_priority;
-uniform uint show_elimination_idx;
+uniform int show_elimination_idx;
 
 flat in ivec2 data_idx;
 flat in int instance_id;
@@ -19,7 +19,7 @@ void main()
 {
     float min_priority = texelFetch(priority_data_tx2D,data_idx,0).y; 
     float priority = texelFetch(priority_data_tx2D,data_idx,0).x;
-    float v = (priority-min_priority) / (float(highest_priority)-min_priority);
+    float v = (float(highest_priority)-min_priority > 0.0) ? (priority-min_priority) /(float(highest_priority)-min_priority) : 0.0;
 
     float r = v;
     float g = 0.0;
@@ -29,12 +29,12 @@ void main()
 
     if(mode == 0)
     {
-        if( (distance_to_center < (time/collision_time)) && (uint(instance_id) < show_elimination_idx) )
+        if( (distance_to_center < (time/collision_time)) && (instance_id < show_elimination_idx) )
             frag_colour = vec4(0.0,0.0,0.0,1.0);
     }
     else
     {
-        if( (distance_to_center < (time/collision_time)*current_radius) && (uint(instance_id) < show_elimination_idx) )
+        if( (distance_to_center < (time/collision_time)*current_radius) && (instance_id < show_elimination_idx) )
             frag_colour = vec4(0.0,0.0,0.0,1.0);
     }
 }

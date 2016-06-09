@@ -2183,8 +2183,8 @@ struct CollisionSpheres
 		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "highest_priority"),1,&highest_priority);
 
 		uint remaining_sphere_cnt = sphere_cnt-current_timestep;
-		uint show_elimination_idx = remaining_sphere_cnt*show_eliminations_factor;
-		glUniform1uiv(glGetUniformLocation(cs_prgm_handle, "show_elimination_idx"),1,  &show_elimination_idx);
+		int show_elimination_idx = remaining_sphere_cnt*show_eliminations_factor;
+		glUniform1iv(glGetUniformLocation(cs_prgm_handle, "show_elimination_idx"),1,  &show_elimination_idx);
 
 		cs_mesh.draw(remaining_sphere_cnt);
 		glCullFace(GL_BACK);
