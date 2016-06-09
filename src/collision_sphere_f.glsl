@@ -29,12 +29,12 @@ void main()
 
     if(mode == 0)
     {
-        if( (distance_to_center < (time/collision_time)) && (uint(instance_id) > show_elimination_idx) )
+        if( (distance_to_center < (time/collision_time)) && (uint(instance_id) < show_elimination_idx) )
             frag_colour = vec4(0.0,0.0,0.0,1.0);
     }
     else
     {
-        if( (distance_to_center < (time/collision_time)*current_radius) && (uint(instance_id) > show_elimination_idx) )
+        if( (distance_to_center < (time/collision_time)*current_radius) && (uint(instance_id) < show_elimination_idx) )
             frag_colour = vec4(0.0,0.0,0.0,1.0);
     }
 }
