@@ -2085,12 +2085,17 @@ struct CollisionSpheres
 
 		sphere_cnt = spheres.size() - 4;
 
+		current_timestep = (sphere_cnt > 1000) ? sphere_cnt - 1000 : 0;
+		time = spheres[current_timestep].collision_time;
+
 		// Extract information from collision sphere and store in texture for rendering
 		uint tx_height = std::ceil( static_cast<float>(sphere_cnt) / 8096.0f );
 		std::vector<float> tx_data(8096*tx_height*4,0.0f);
-		std::vector<float> prio_tx_data(8096*tx_height,0.0f);
+		std::vector<float> prio_tx_data(8096*tx_height*2,0.0f);
 
-		for(uint i=0; i<sphere_cnt; i++)
+		float min_priority = static_cast<float>(spheres[sphere_cnt-1].priority);
+
+		for(int i = (sphere_cnt-1); i >= 0; i=i-1)
 		{
 			tx_data[i*4 + 0] = (spheres[i].lat);
 			tx_data[i*4 + 1] = (spheres[i].lon);
@@ -2109,16 +2114,16 @@ struct CollisionSpheres
 
 			float d = (p-q).length();
 
-			// filtering results that seem impossible (a quick hack)
-			d = (d>2.0) ? 0.0 : d;
-
 			float radius = d * (rp/(rp+rq));
 
 			tx_data[i*4 + 2] = (radius);
-
 			tx_data[i*4 + 3] = (spheres[i].collision_time);
 			
-			prio_tx_data[i] = static_cast<float>(spheres[i].priority);
+
+			min_priority = std::min(min_priority,static_cast<float>(spheres[i].priority));
+			prio_tx_data[i*2 +0] = static_cast<float>(spheres[i].priority);
+			prio_tx_data[i*2 +1] = min_priority;
+
 			highest_priority = std::max(highest_priority,spheres[i].priority);
 		}
 
@@ -2139,7 +2144,7 @@ struct CollisionSpheres
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, 8096, tx_height, 0, GL_RED, GL_FLOAT, prio_tx_data.data());
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, 8096, tx_height, 0, GL_RG, GL_FLOAT, prio_tx_data.data());
 		glBindTexture(GL_TEXTURE_2D,0);
 		
 	}
@@ -3137,7 +3142,7 @@ int main(int argc, char*argv[])
 		for(int lat=-90; lat<=90 ; lat++)
 			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
 
-		labels.addLabel("\"()*-_ßöäüÜÖÄ",48.0,5.0,0.25);
+		//labels.addLabel("\"()*-_ßöäüÜÖÄ",48.0,5.0,0.25);
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;

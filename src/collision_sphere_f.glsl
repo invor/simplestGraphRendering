@@ -15,8 +15,9 @@ out vec4 frag_colour;
 
 void main()
 {
+    float min_priority = texelFetch(priority_data_tx2D,data_idx,0).y; 
     float priority = texelFetch(priority_data_tx2D,data_idx,0).x;
-    float v = priority/float(highest_priority);
+    float v = (priority-min_priority) / (float(highest_priority)-min_priority);
 
     float r = v;
     float g = 0.0;
