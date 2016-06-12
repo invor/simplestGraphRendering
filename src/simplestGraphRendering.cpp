@@ -2277,11 +2277,14 @@ struct TextLabels
 		glGenTextures(1, &font_atlas_handle);
 		//assert(font_atlas_handle > 0);
 		glBindTexture(GL_TEXTURE_2D, font_atlas_handle);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x_dim, y_dim, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_BASE_LEVEL,0);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,3);
 		glBindTexture(GL_TEXTURE_2D,0);
 
 		delete[] img_data;
@@ -2444,6 +2447,151 @@ struct TextLabels
 				glUniform1iv(glGetUniformLocation(prgm_handle,"label_text_tx2D"),1,&one);
 
 				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*) offsets[i] );
+			}
+		}
+	}
+};
+
+struct Icons
+{
+	enum Icon
+	{
+		ATM2,
+		BUS,
+		INFORMATION,
+		PARKINGGARAGE,
+		RESTAURANT,
+		SIGHT2,
+		TAXI,
+		TELEPHONE,
+		TOILETS,
+		TOOLS,
+		TRASH,
+		WIFI
+	};
+
+	std::array<float,255> u;
+	std::array<float,255> v;
+
+	GLuint va_handle;
+	GLuint vbo_handle;
+	GLuint ibo_handle;
+
+	GLuint prgm_handle;
+
+	GLuint icon_atlas_handle;
+
+	/** Total number of labels */
+	uint icon_cnt = 0;
+
+	/** Geo-Cooridnates of each label */
+	std::vector<float> geoCoordinates;
+	/** Relative scale of each icon */
+	std::vector<float> scales;
+	/** Visibility of each icon i.e. rendered or not */
+	std::vector<bool> visibility;
+	/** */
+	std::vector<float> atlas_uv;
+
+	Icons()
+	{
+		// Load text label shader program
+		prgm_handle = createShaderProgram("../src/icon_v.glsl","../src/icon_f.glsl",{"v_position","v_uv"});
+
+		// Load icon atlas
+		unsigned long begin_pos;
+		int x_dim, y_dim;
+		char* img_data;
+		ResourceLoader::readPpmHeader("../resources/icon_atlas.ppm", begin_pos, x_dim, y_dim);
+		img_data = new char[x_dim * y_dim * 3];
+		ResourceLoader::readPpmData("../resources/icon_atlas.ppm", img_data, begin_pos, x_dim, y_dim);
+
+		glGenTextures(1, &icon_atlas_handle);
+		//assert(font_atlas_handle > 0);
+		glBindTexture(GL_TEXTURE_2D, icon_atlas_handle);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, x_dim, y_dim, 0, GL_RGB, GL_UNSIGNED_BYTE, img_data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glBindTexture(GL_TEXTURE_2D,0);
+
+		// Create proxy geometry for icons
+		float x_min = -0.086f;
+		float x_max = 0.086f;
+		std::array< float, 16 > vertex_array = {{ x_min,-0.1f,0.0f,0.0f,
+												x_min,0.1f,0.0f,1.0f,
+												x_max,0.1f,1.0f,1.0f,
+												x_max,-0.1f,1.0f,0.0f }};
+		std::array< GLuint, 6 > index_array = {{ 0,2,1,2,0,3 }};
+
+		glGenVertexArrays(1, &va_handle);
+		glGenBuffers(1, &vbo_handle);
+		glGenBuffers(1, &ibo_handle);
+
+		glBindVertexArray(va_handle);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)* 16, vertex_array.data(), GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_handle);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)* 6, index_array.data(), GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(GL_FLOAT)*4, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(GL_FLOAT)*4, (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER,0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	}
+
+	~Icons()
+	{
+	}
+
+	void addIcon(Icon icon, float latitude, float longitude, float scale)
+	{
+		icon_cnt++;
+
+		geoCoordinates.push_back(longitude);
+		geoCoordinates.push_back(latitude);
+
+		float uv_x = (1.0f/9.0f) + 2.0f * (1.0f/9.0f) * (icon % 4);
+		float uv_y = (1.0f/9.0f) + 2.0f * (1.0f/9.0f) * std::floor(icon / 4.0f);
+
+		atlas_uv.push_back(uv_x);
+		atlas_uv.push_back(uv_y);
+
+		scales.push_back(scale);
+
+		visibility.push_back(true);
+	}
+
+	void draw(OrbitalCamera& camera)
+	{
+		glUseProgram(prgm_handle);
+
+		// bind font atlas texture
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D,icon_atlas_handle);
+		int zero = 0;
+		glUniform1iv(glGetUniformLocation(prgm_handle,"iconAtlas_tx2D"),1,&zero);
+
+		// set label independent uniforms
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "view_matrix"), 1, GL_FALSE, camera.view_matrix.data.data());
+		glUniformMatrix4fv(glGetUniformLocation(prgm_handle, "projection_matrix"), 1, GL_FALSE, camera.projection_matrix.data.data());
+
+		glBindVertexArray(va_handle);
+
+		for(size_t i=0; i<visibility.size(); i++)
+		{
+			if(visibility[i])
+			{
+				glUniform2fv(glGetUniformLocation(prgm_handle,"icon_geoCoords"),1,&geoCoordinates[i*2]);
+				glUniform1fv(glGetUniformLocation(prgm_handle,"icon_scale"),1,&scales[i]);
+				glUniform2fv(glGetUniformLocation(prgm_handle,"icon_atlasUV"),1,&atlas_uv[i*2]);
+
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 );
 			}
 		}
 	}
@@ -3140,6 +3288,9 @@ int main(int argc, char*argv[])
 		/* Create text labels */
 		TextLabels labels;
 
+		/* Create icons */
+		Icons icons;
+
 		//TODO FIND BUG: camera matrices have to be updated after label object creation....
 		camera.updateViewMatrix();
 		camera.updateProjectionMatrix();
@@ -3150,7 +3301,19 @@ int main(int argc, char*argv[])
 		for(int lat=-90; lat<=90 ; lat++)
 			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
 
-		//labels.addLabel("\"()*-_ßöäüÜÖÄ",48.0,5.0,0.25);
+		//labels.addLabel("\"()*-_ßöäüÜÖÄ",48.0,5.0,0.25);)
+		icons.addIcon(Icons::ATM2,48.0,5.0,0.25);
+		icons.addIcon(Icons::BUS,48.0,5.5,0.25);
+		icons.addIcon(Icons::INFORMATION,48.0,6.0,0.25);
+		icons.addIcon(Icons::PARKINGGARAGE,48.0,6.5,0.25);
+		icons.addIcon(Icons::RESTAURANT,48.0,7.0,0.25);
+		icons.addIcon(Icons::SIGHT2,48.0,7.5,0.25);
+		icons.addIcon(Icons::TAXI,48.0,8.0,0.25);
+		icons.addIcon(Icons::TELEPHONE,48.0,8.5,0.25);
+		icons.addIcon(Icons::TOILETS,48.0,9.0,0.25);
+		icons.addIcon(Icons::TOOLS,48.0,10.0,0.25);
+		icons.addIcon(Icons::TRASH,48.0,10.5,0.25);
+		icons.addIcon(Icons::WIFI,48.0,11.0,0.25);
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
@@ -3211,6 +3374,9 @@ int main(int argc, char*argv[])
 
 			/* Draw labels */
 			labels.draw(camera);
+
+			/* Draw icons */
+			icons.draw(camera);
 
 			// GeoBoundingBox bbox = camera.computeVisibleArea();
 			//std::cout << std::fixed;
