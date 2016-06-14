@@ -2467,7 +2467,10 @@ struct Icons
 		TOILETS,
 		TOOLS,
 		TRASH,
-		WIFI
+		WIFI,
+		HOSPITAL,
+		CINEMA,
+		THEATER
 	};
 
 	std::array<float,255> u;
@@ -3313,6 +3316,9 @@ int main(int argc, char*argv[])
 		icons.addIcon(Icons::TOOLS,48.0,10.0,0.25);
 		icons.addIcon(Icons::TRASH,48.0,10.5,0.25);
 		icons.addIcon(Icons::WIFI,48.0,11.0,0.25);
+		icons.addIcon(Icons::HOSPITAL,48.0,11.5,0.25);
+		icons.addIcon(Icons::CINEMA,48.0,12.0,0.25);
+		icons.addIcon(Icons::THEATER,48.0,12.5,0.25);
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
