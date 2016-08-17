@@ -3118,7 +3118,7 @@ int main(int argc, char*argv[])
 
 	int i=1;
     if (argc < 3) {
-		std::cout<<"Supply a graph with -gf <graph.gl> or -gf <graph.sg>"<<std::endl; return 0;
+		std::cout<<"simple -gf <graph.gl|graph.sg> [-t <float=triangle transparency>] [-x <float=show elimination factor>] [-opengl3]"<<std::endl; return 0;
 	}
 	while(i<argc)
 	{
