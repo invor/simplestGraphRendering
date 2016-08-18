@@ -10,7 +10,6 @@
 
 #include <string>
 #include <locale>
-#include <codecvt>
 #include <cstring>
 
 #include <algorithm>
@@ -403,6 +402,47 @@ const std::string readShaderFile(const char* const path)
 	inFile.close();
 
 	return source.str();
+}
+
+std::vector<uint16_t> toUnicodePoints(const std::string & str)
+{
+	std::vector<uint16_t> result;
+	for(std::string::const_iterator it(str.begin()), end(str.end()); it != end; ++it)
+	{
+		if (static_cast<uint8_t>(*it) < 0x80)
+		{
+			result.emplace_back(*it);
+		}
+		else if ((static_cast<uint8_t>(*it) >> 5) == 0x6)
+		{ //codepoints is encoded by 2
+			uint32_t code_point = *it;
+			++it;
+			assert(it != end);
+			code_point = ((code_point << 6) & 0x7ff) + ((*it) & 0x3f);
+			result.emplace_back(code_point);
+		}
+		else if ((static_cast<uint8_t>(*it) >> 3) == 0x1e)
+		{
+			uint32_t code_point = static_cast<uint8_t>(*it);
+			++it;
+			assert(it != end);
+
+			code_point = ((code_point << 12) & 0xffff) + ((static_cast<uint8_t>(*it) << 6) & 0xfff);
+			++it;
+			assert(it != end);
+
+			code_point += (*it) & 0x3f;
+			if (code_point > std::numeric_limits<uint16_t>::max()) {
+				throw std::range_error("Cannot encode unicode codepoint in 2 Bytes");
+			}
+			result.emplace_back(code_point);
+		}
+		else
+		{
+			throw std::runtime_error("utf8 codepoints with more than 2 Bytes are not supported");
+		}
+	}
+	return result;
 }
 
 /**
@@ -2212,15 +2252,14 @@ struct TextLabels
 		//	atlas_rows.push_back( L"\"()*-_ßöäü");
 
 		// Using u16string, hoping to gain support for umlauts
-		std::vector<std::u16string> u16_atlas_rows;
-		std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf16conv;
+		std::vector< std::vector<uint16_t> > u16_atlas_rows;
 
-		u16_atlas_rows.push_back(utf16conv.from_bytes( "ABCDEFGHIJKLMN" ));
-		u16_atlas_rows.push_back(utf16conv.from_bytes( "OPQRSTUVWXYZab" ));
-		u16_atlas_rows.push_back(utf16conv.from_bytes( "cdefghijklmnop" ));
-		u16_atlas_rows.push_back(utf16conv.from_bytes( "qrstuvwxyz1234" ));
-		u16_atlas_rows.push_back(utf16conv.from_bytes( "567890&@.,?!'\"" ));
-		u16_atlas_rows.push_back(utf16conv.from_bytes( "\"()*-_ßöäüÖÄÜ" ));
+		u16_atlas_rows.push_back(toUnicodePoints( "ABCDEFGHIJKLMN" ));
+		u16_atlas_rows.push_back(toUnicodePoints( "OPQRSTUVWXYZab" ));
+		u16_atlas_rows.push_back(toUnicodePoints( "cdefghijklmnop" ));
+		u16_atlas_rows.push_back(toUnicodePoints( "qrstuvwxyz1234" ));
+		u16_atlas_rows.push_back(toUnicodePoints( "567890&@.,?!'\"" ));
+		u16_atlas_rows.push_back(toUnicodePoints( "\"()*-_ßöäüÖÄÜ" ));
 
 		float u_value = 1.0f/16.0f;
 		float v_value = 5.0f/6.0f;
@@ -2383,8 +2422,7 @@ struct TextLabels
 		//		data[i*2 + 1] = v[label_text[i]];
 		//	}
 
-		std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> utf16conv;
-		std::u16string u16_label_text = utf16conv.from_bytes(label_text);
+		std::vector<uint16_t> u16_label_text = toUnicodePoints(label_text);
 
 		uint i = 0;
 		for(auto& c : u16_label_text)
