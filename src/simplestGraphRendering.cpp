@@ -2118,6 +2118,20 @@ struct CollisionSpheres
 
 		time = collision_sphere_data[current_timestep].collision_time;
 	}
+	
+	static constexpr double DEG_TO_RAD = 0.017453292519943295769236907684886;
+	static constexpr double EARTH_RADIUS_IN_CENTIMETERS = 637279756.0856;
+	
+	double haversine(const CollisionSphere & from, const CollisionSphere & to) {
+		double lat_arc = (from.lat- to.lat) * DEG_TO_RAD;
+		double lon_arc = (from.lon - to.lon) * DEG_TO_RAD;
+		double lat_h = sin(lat_arc * 0.5);
+		lat_h *= lat_h;
+		double lon_h = sin(lon_arc * 0.5);
+		lon_h *= lon_h;
+		double tmp = cos(from.lat*DEG_TO_RAD) * cos(to.lat*DEG_TO_RAD);
+		return 2.0 * asin(sqrt(lat_h + tmp*lon_h));
+	}
 
 	void loadData(std::vector<CollisionSphere>& spheres, std::map<uint,uint>& id_map)
 	{
@@ -2152,9 +2166,12 @@ struct CollisionSpheres
 			double rp = spheres[i].radius;
 			double rq = spheres[q_idx].radius;
 
-			float d = (p-q).length();
+// 			float d = (p-q).length();
+			double d = haversine(spheres[i], spheres[q_idx]);
+			
 
-			float radius = d * (rp/(rp+rq));
+			double bl = d * (rp/(rp+rq));
+			double radius = 2.0 * ::sin(bl/2.0);
 
 			tx_data[i*4 + 2] = (radius);
 			tx_data[i*4 + 3] = (spheres[i].collision_time);
