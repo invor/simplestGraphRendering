@@ -1726,8 +1726,8 @@ struct TriangleGraph
 	Math::Vec3 sphere_world_position;
 	float sphere_scale;
 	float sphere_target_scale;
-	std::chrono::time_point<std::chrono::system_clock,std::chrono::system_clock::duration> t_0;
-	std::chrono::time_point<std::chrono::system_clock,std::chrono::system_clock::duration> t_1;
+	std::chrono::time_point<std::chrono::high_resolution_clock> t_0;
+	std::chrono::time_point<std::chrono::high_resolution_clock> t_1;
 
 	IcoSphere sphere;
 
@@ -3341,7 +3341,7 @@ int main(int argc, char*argv[])
 		for(int lat=-90; lat<=90 ; lat++)
 			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
 
-		//labels.addLabel("\"()*-_ßöäüÜÖÄ",48.0,5.0,0.25);)
+		labels.addLabel("\"()*-_ßöäüÜÖÄ",5.0,5.0,0.25);
 		icons.addIcon(Icons::ATM2,48.0,5.0,0.25);
 		icons.addIcon(Icons::BUS,48.0,5.5,0.25);
 		icons.addIcon(Icons::INFORMATION,48.0,6.0,0.25);

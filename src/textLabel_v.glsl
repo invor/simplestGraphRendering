@@ -7,6 +7,7 @@ uniform mat4 projection_matrix;
 
 uniform vec2 label_geoCoords;
 uniform float label_scale;
+uniform float label_charCount;
 
 in vec2 v_position;
 in vec2 v_uv;
@@ -45,6 +46,8 @@ void main()
 	vec4 ccs_position = view_matrix * vec4(world_position,1.0);
 	// build base quad for each character in NDCS and add horizontal offset of char position in string
 	ccs_position += vec4(v_position*label_scale*ccs_scale,0.0,0.0);
+
+	ccs_position.xy -= max(-1.0,min(1.0,ccs_position.x)) * label_scale*ccs_scale*vec2(0.03*label_charCount,0.0);
 	
 	vec4 dcs_position = projection_matrix * ccs_position;
 	
