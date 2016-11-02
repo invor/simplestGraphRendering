@@ -3151,10 +3151,12 @@ int main(int argc, char*argv[])
 	std::string filepath;
 	float trianlge_transparency = 1.0f;
 	float etd = 0.0f;
+	
+	int glMajorVersion = 4;
 
 	int i=1;
     if (argc < 3) {
-		std::cout<<"Supply a graph with -gf <graph.gl> or -gf <graph.sg>"<<std::endl; return 0;
+		std::cout<<"simple -gf <graph.gl|graph.sg> [-t <float=triangle transparency>] [-x <float=show elimination factor>] [-opengl3]"<<std::endl; return 0;
 	}
 	while(i<argc)
 	{
@@ -3176,6 +3178,11 @@ int main(int argc, char*argv[])
 			if(i<argc && argv[i][0] != '-') { etd = std::stof(argv[i]); i++; }
 			else { std::cout<<"Missing parameter for -x"<<std::endl; return 0; }
 		}
+		else if(argv[i] == (std::string) "-opengl3")
+		{
+			glMajorVersion = 3;
+			++i;
+		}
 		else
 		{
 			i++;
@@ -3194,8 +3201,8 @@ int main(int argc, char*argv[])
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, glMajorVersion);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_SAMPLES,4);
