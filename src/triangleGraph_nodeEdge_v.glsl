@@ -6,9 +6,9 @@ uniform mat4 view_matrix;
 uniform mat4 projection_matrix;
 
 in vec2 v_geoCoords;
-in vec3 v_colour;
+in vec4 v_colour;
 
-out vec3 colour;
+out vec4 colour;
 
 void main()
 {
