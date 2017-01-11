@@ -3170,6 +3170,21 @@ namespace Controls {
 	}
 }
 
+void help(std::ostream & out) {
+	out << "simple OPTIONS:\n"
+		"\t-gf <graph.gl|graph.sg>\tfile suffix selects the type of the graph\n"
+		"\t-f format\tformat=[sg, gl, raw] overrides file suffix\n"
+		"\t-t float\ttriangle transparency\n"
+		"\t-x float\tshow elimination factor\n"
+		"\t-bg float float float float\tset the background color\n"
+		"\t-opengl3\tuse opengl 3 instead of 4\n"
+		"\t--debug\tenable some debugging output\n"
+		"\t--no-bg-sphere\tdisable the background sphere\n"
+		"\t--no-angle-labels\tdisable angle labels\n"
+	<< std::flush;
+}
+
+typedef enum {GFF_INVALID, GFF_SG, GFF_GL, GFF_RAW} GraphFileFormat;
 
 int main(int argc, char*argv[])
 {
@@ -3178,14 +3193,20 @@ int main(int argc, char*argv[])
 	/////////////////////////////////////
 
 	std::string filepath;
+	float bgColor[4] = {0.2f, 0.2f, 0.2f, 1.0f};
 	float trianlge_transparency = 1.0f;
 	float etd = 0.0f;
+	bool debugMode = false;
+	bool disableBgSphere = false;
+	bool angleLabels = true;
+	GraphFileFormat gff = GFF_INVALID;
 	
 	int glMajorVersion = 4;
 
 	int i=1;
     if (argc < 3) {
-		std::cout<<"simple -gf <graph.gl|graph.sg> [-t <float=triangle transparency>] [-x <float=show elimination factor>] [-opengl3]"<<std::endl; return 0;
+		help(std::cout);
+		return 0;
 	}
 	while(i<argc)
 	{
@@ -3193,24 +3214,68 @@ int main(int argc, char*argv[])
 		{
 			i++;
 			if(i<argc && argv[i][0] != '-') { filepath = argv[i]; i++; }
-			else { std::cout<<"Missing parameter for -gf"<<std::endl; return 0; }
+			else { std::cerr<<"Missing parameter for -gf"<<std::endl; return -1; }
+		}
+		else if(argv[i] == (std::string) "-f")
+		{
+			i++;
+			if(i>argc) {
+				std::cerr << "Missing parameter for -f" << std::endl;
+				return -1;
+			}
+			std::string token(argv[i]);
+			if (token == "sg") { gff = GFF_SG; }
+			else if (token == "gl") { gff = GFF_GL; }
+			else if (token == "raw") { gff = GFF_RAW; }
+			else {
+				std::cerr << "Unkown graph file format: " << token << std::endl;
+				return -1;
+			}
 		}
 		else if(argv[i] == (std::string) "-t")
 		{
 			i++;
 			if(i<argc && argv[i][0] != '-') { trianlge_transparency = std::stof(argv[i]); i++; }
-			else { std::cout<<"Missing parameter for -t"<<std::endl; return 0; }
+			else { std::cerr<<"Missing parameter for -t"<<std::endl; return -1; }
 		}
 		else if(argv[i] == (std::string) "-x")
 		{
 			i++;
 			if(i<argc && argv[i][0] != '-') { etd = std::stof(argv[i]); i++; }
-			else { std::cout<<"Missing parameter for -x"<<std::endl; return 0; }
+			else { std::cerr<<"Missing parameter for -x"<<std::endl; return -1; }
+		}
+		else if(argv[i] == (std::string) "-bg") {
+			++i;
+			if(i+4 <= argc) {
+				bgColor[0] = std::stof(argv[i]);
+				bgColor[1] = std::stof(argv[i+1]);
+				bgColor[2] = std::stof(argv[i+2]);
+				bgColor[3] = std::stof(argv[i+3]);
+				i += 4;
+			}
+			else {
+				std::cerr << "Not enough parameters for -bg" << std::endl; 
+				return -1;
+			}
 		}
 		else if(argv[i] == (std::string) "-opengl3")
 		{
-			glMajorVersion = 3;
 			++i;
+			glMajorVersion = 3;
+		}
+		else if(argv[i] == (std::string) "--debug")
+		{
+			i++;
+			debugMode = true;
+		}
+		else if(argv[i] == (std::string) "--no-bg-sphere")
+		{
+			i++;
+			disableBgSphere = true;
+		}
+		else if (argv[i] == (std::string) "--no-angle-labels") {
+			i++;
+			angleLabels = false;
 		}
 		else
 		{
@@ -3283,25 +3348,30 @@ int main(int argc, char*argv[])
 	std::map<uint,uint> idMap;
 
 	/* Decide which graph format to load */
-	bool gl = false;
-	bool sg = false;
-	bool raw = false;
-	size_t filepath_length = filepath.length();
+	std::size_t filepath_length = filepath.length();
 	std::string file_format(filepath.substr(filepath_length-2, 2));
 
 	if(file_format == "gl")
-		gl = true;
+		gff = GFF_GL;
 	else if(file_format == "sg")
-		sg = true;
+		gff = GFF_SG;
 	else if(file_format == "aw")
-		raw = true;
+		gff = GFF_RAW;
 
-	if(gl)
+	switch (gff) {
+	case GFF_GL:
 		Parser::parseTxtGraphFile(filepath,nodes,edges);
-	else if(sg)
+		break;
+	case GFF_SG:
 		Parser::parseTxtTriangleGraphFile(filepath,nodes_rgb,edges_rgb,triangles_rgb);
-	else if(raw)
+		break;
+	case GFF_RAW:
 		Parser::parseTxtCollisionSpheresFile(filepath,cSpheres,idMap);
+		break;
+	default:
+		std::cerr << "Unkown graph format" << std::endl;
+		return -1;
+	}
 
 	/////////////////////////////////////////////////////////////////////
 	// Creation of graphics resources, i.e. shader programs, meshes, etc.
@@ -3321,12 +3391,12 @@ int main(int argc, char*argv[])
 
 		/* Create renderable graph (mesh) */
 		Graph lineGraph;
-		if(gl)
+		if(gff == GFF_GL)
 			lineGraph.addSubgraph(nodes,edges);
 
 		/* Create renderable simple graph (mesh) */
 		TriangleGraph simpleColouredGraph;
-		if(sg)
+		if(gff == GFF_SG)
 		{
 			simpleColouredGraph.loadGraphData(nodes_rgb,edges_rgb,triangles_rgb);
 			Controls::setActiveTriangleGraph(&simpleColouredGraph);
@@ -3335,7 +3405,7 @@ int main(int argc, char*argv[])
 
 		/* Create renderable collision spheres */
 		CollisionSpheres collisionSpheres;
-		if(raw)
+		if(gff == GFF_RAW)
 		{
 			collisionSpheres.loadData(cSpheres,idMap);
 			Controls::setActiveCollisionSpheres(&collisionSpheres);
@@ -3371,28 +3441,31 @@ int main(int argc, char*argv[])
 		camera.updateViewMatrix();
 		camera.updateProjectionMatrix();
 
-		for(int lon=-180; lon<=180 ; lon++)
-			labels.addLabel(std::to_string(lon),0.0,(float)lon,0.25);
+		if (angleLabels) {
+			for(int lon=-180; lon<=180 ; lon++)
+				labels.addLabel(std::to_string(lon),0.0,(float)lon,0.25);
 
-		for(int lat=-90; lat<=90 ; lat++)
-			labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
-
-		labels.addLabel("\"()*-_ßöäüÜÖÄ",5.0,5.0,0.25);
-		icons.addIcon(Icons::ATM2,48.0,5.0,0.25);
-		icons.addIcon(Icons::BUS,48.0,5.5,0.25);
-		icons.addIcon(Icons::INFORMATION,48.0,6.0,0.25);
-		icons.addIcon(Icons::PARKINGGARAGE,48.0,6.5,0.25);
-		icons.addIcon(Icons::RESTAURANT,48.0,7.0,0.25);
-		icons.addIcon(Icons::SIGHT2,48.0,7.5,0.25);
-		icons.addIcon(Icons::TAXI,48.0,8.0,0.25);
-		icons.addIcon(Icons::TELEPHONE,48.0,8.5,0.25);
-		icons.addIcon(Icons::TOILETS,48.0,9.0,0.25);
-		icons.addIcon(Icons::TOOLS,48.0,10.0,0.25);
-		icons.addIcon(Icons::TRASH,48.0,10.5,0.25);
-		icons.addIcon(Icons::WIFI,48.0,11.0,0.25);
-		icons.addIcon(Icons::HOSPITAL,48.0,11.5,0.25);
-		icons.addIcon(Icons::CINEMA,48.0,12.0,0.25);
-		icons.addIcon(Icons::THEATER,48.0,12.5,0.25);
+			for(int lat=-90; lat<=90 ; lat++)
+				labels.addLabel(std::to_string(lat),(float)lat,0.0,0.25);
+		}
+		if (debugMode) {
+			labels.addLabel("\"()*-_ßöäüÜÖÄ",5.0,5.0,0.25);
+			icons.addIcon(Icons::ATM2,48.0,5.0,0.25);
+			icons.addIcon(Icons::BUS,48.0,5.5,0.25);
+			icons.addIcon(Icons::INFORMATION,48.0,6.0,0.25);
+			icons.addIcon(Icons::PARKINGGARAGE,48.0,6.5,0.25);
+			icons.addIcon(Icons::RESTAURANT,48.0,7.0,0.25);
+			icons.addIcon(Icons::SIGHT2,48.0,7.5,0.25);
+			icons.addIcon(Icons::TAXI,48.0,8.0,0.25);
+			icons.addIcon(Icons::TELEPHONE,48.0,8.5,0.25);
+			icons.addIcon(Icons::TOILETS,48.0,9.0,0.25);
+			icons.addIcon(Icons::TOOLS,48.0,10.0,0.25);
+			icons.addIcon(Icons::TRASH,48.0,10.5,0.25);
+			icons.addIcon(Icons::WIFI,48.0,11.0,0.25);
+			icons.addIcon(Icons::HOSPITAL,48.0,11.5,0.25);
+			icons.addIcon(Icons::CINEMA,48.0,12.0,0.25);
+			icons.addIcon(Icons::THEATER,48.0,12.5,0.25);
+		}
 
 		/* Create the debug sphere */
 		DebugSphere db_sphere;
@@ -3419,14 +3492,17 @@ int main(int argc, char*argv[])
 
 		    /* Render here */
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+			//set background colour
+			glClearColor(bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			int width, height;
 			glfwGetFramebufferSize(window, &width, &height);
 			glViewport(0, 0, width, height);
 
 			/* Draw debug sphere */
-			db_sphere.draw(camera);
+			if (!disableBgSphere) {
+				db_sphere.draw(camera);
+			}
 
 			/* Draw polygons */
 			//polys.draw(camera);
@@ -3434,14 +3510,14 @@ int main(int argc, char*argv[])
 			/* Draw edges (i.e. streets) */
 			float scale = std::min((0.0025f/(camera.orbit - 1.0f)),2.0f);
 
-			if(gl)
+			if(gff == GFF_GL)
 				lineGraph.draw( camera, scale );
-			else if(sg)
+			else if(gff == GFF_SG)
 			{
 				simpleColouredGraph.draw( camera, trianlge_transparency );
 				simpleColouredGraph.pickingPass( camera );
 			}
-			else if(raw)
+			else if(gff == GFF_RAW)
 			{
 				collisionSpheres.draw(camera);
 				collisionSpheres.show_eliminations_factor = etd;
