@@ -276,8 +276,8 @@ struct Vertex
 
 struct Node_RGB
 {
-	Node_RGB() : lat(0), lon(0) {}
-	Node_RGB(double la, double lo, char r, char g, char b) : lat(la), lon(lo), r(r), g(g), b(b) {}
+	Node_RGB() : lat(0), lon(0), r(0), g(0), b(0), a((char)255) {}
+	Node_RGB(double la, double lo, char r, char g, char b, char a = (char)255) : lat(la), lon(lo), r(r), g(g), b(b), a(a) {}
 
 	double lat;
 	double lon;
@@ -285,39 +285,42 @@ struct Node_RGB
 	char r;
 	char g;
 	char b;
+	char a;
 };
 
 struct Edge_RGB
 {
-	Edge_RGB() : source(0), target(0), r(0), g(0), b(0) {}
-	Edge_RGB(uint s, uint t, char r, char g, char b)
-		: source(s), target(t), r(r), g(g), b(b) {}
+	Edge_RGB() : source(0), target(0), r(0), g(0), b(0), a((char)255) {}
+	Edge_RGB(uint s, uint t, char r, char g, char b, char a = (char)255)
+		: source(s), target(t), r(r), g(g), b(b), a(a) {}
 
 	uint source;
 	uint target;
 	char r;
 	char g;
 	char b;
+	char a;
 };
 
 struct Vertex_RGB
 {
-	Vertex_RGB() : longitude(0.0), latitude(0.0), r(0), g(0), b(0) {}
-	Vertex_RGB(float lon, float lat, char r, char g, char b)
-		: longitude(lon), latitude(lat), r(r), g(g), b(b) {}
+	Vertex_RGB() : longitude(0.0), latitude(0.0), r(0), g(0), b(0), a((char)255) {}
+	Vertex_RGB(float lon, float lat, char r, char g, char b, char a = (char)255)
+		: longitude(lon), latitude(lat), r(r), g(g), b(b), a(a) {}
 
 	float longitude;
 	float latitude;
 	char r;
 	char g;
 	char b;
+	char a;
 };
 
 struct Vertex_ID_RGB
 {
-	Vertex_ID_RGB() : longitude(0.0), latitude(0.0), id(-1), r(0), g(0), b(0) {}
-	Vertex_ID_RGB(float lon, float lat, char r, char g, char b, int id)
-		: longitude(lon), latitude(lat), id(id), r(r), g(g), b(b) {}
+	Vertex_ID_RGB() : longitude(0.0), latitude(0.0), id(-1), r(0), g(0), b(0), a((char)255) {}
+	Vertex_ID_RGB(float lon, float lat, char r, char g, char b, int id, char a = (char)255)
+		: longitude(lon), latitude(lat), id(id), r(r), g(g), b(b), a(a) {}
 
 	float longitude;
 	float latitude;
@@ -325,6 +328,7 @@ struct Vertex_ID_RGB
 	char r;
 	char g;
 	char b;
+	char a;
 };
 
 struct Vertex_XYZ
@@ -340,9 +344,9 @@ struct Vertex_XYZ
 
 struct Triangle_RGB
 {
-	Triangle_RGB() : v1(0), v2(0), v3(0), r(0), g(0), b(0) {}
-	Triangle_RGB(uint v1, uint v2, uint v3, char r, char g, char b)
-		: v1(v1), v2(v2), v3(v3), r(r), g(g), b(b) {}
+	Triangle_RGB() : v1(0), v2(0), v3(0), r(0), g(0), b(0), a((char)255) {}
+	Triangle_RGB(uint v1, uint v2, uint v3, char r, char g, char b, char a = (char)255)
+		: v1(v1), v2(v2), v3(v3), r(r), g(g), b(b), a(a) {}
 
 	uint v1;
 	uint v2;
@@ -350,6 +354,7 @@ struct Triangle_RGB
 	char r;
 	char g;
 	char b;
+	char a;
 };
 
 struct CollisionSphere
@@ -832,32 +837,56 @@ namespace Parser
 
 	void createNodeRGB(const std::string& input_string, std::vector<Node_RGB>& n)
 	{
-		std::string lat, lon, r, g, b;
+		std::string lat, lon, r, g, b, a;
 
 		std::stringstream ss(input_string);
-		ss >> lat >> lon >> r >> g >> b;
+		ss >> lat >> lon >> r >> g >> b >> a;
+		
+		int av;
+		try {
+			av = std::stoi(a);
+		}
+		catch (const std::invalid_argument & e) {
+			av = 255;
+		};
 
-		n.emplace_back(std::stof(lat), std::stof(lon), std::stoi(r), std::stoi(g), std::stoi(b));
+		n.emplace_back(std::stof(lat), std::stof(lon), std::stoi(r), std::stoi(g), std::stoi(b), av);
 	}
 
 	void createEdgeRGB(const std::string& input_string, std::vector<Edge_RGB>& e)
 	{
-		std::string source, target, r, g, b;
+		std::string source, target, r, g, b, a;
 
 		std::stringstream ss(input_string);
-		ss >> source >> target >> r >> g >> b;
+		ss >> source >> target >> r >> g >> b >> a;
+		
+		int av;
+		try {
+			av = std::stoi(a);
+		}
+		catch (const std::invalid_argument & e) {
+			av = 255;
+		};
 
-		e.emplace_back(std::stoul(source), std::stoul(target), std::stoi(r), std::stoi(g), std::stoi(b));
+		e.emplace_back(std::stoul(source), std::stoul(target), std::stoi(r), std::stoi(g), std::stoi(b), av);
 	}
 
 	void createTriangleRGB(const std::string& input_string, std::vector<Triangle_RGB>& t)
 	{
-		std::string v1, v2, v3, r, g, b;
+		std::string v1, v2, v3, r, g, b, a;
 
 		std::stringstream ss(input_string);
-		ss >> v1 >> v2 >> v3 >> r >> g >> b;
+		ss >> v1 >> v2 >> v3 >> r >> g >> b >> a;
+		
+		int av;
+		try {
+			av = std::stoi(a);
+		}
+		catch (const std::invalid_argument & e) {
+			av = 255;
+		};
 
-		t.emplace_back(std::stoul(v1), std::stoul(v2), std::stoul(v3), std::stoi(r), std::stoi(g), std::stoi(b));
+		t.emplace_back(std::stoul(v1), std::stoul(v2), std::stoul(v3), std::stoi(r), std::stoi(g), std::stoi(b), av);
 	}
 
 	bool parseTxtTriangleGraphFile(const std::string& graphfile, std::vector<Node_RGB>& n, std::vector<Edge_RGB>& e, std::vector<Triangle_RGB>& t)
@@ -1761,7 +1790,7 @@ struct TriangleGraph
 		uint index_counter = 0;
 		for(auto& node : nodes)
 		{
-			node_vertices.push_back(Vertex_RGB((float)node.lon,(float)node.lat, node.r, node.g, node.b));
+			node_vertices.push_back(Vertex_RGB((float)node.lon,(float)node.lat, node.r, node.g, node.b, node.a));
 
 			node_indices.push_back(index_counter++);
 		}
@@ -1794,7 +1823,7 @@ struct TriangleGraph
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_RGB), 0);
 		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -1815,8 +1844,8 @@ struct TriangleGraph
 		index_counter = 0;
 		for(auto& edge : edges)
 		{
-			edge_vertices.push_back(Vertex_RGB(nodes[edge.source].lon,nodes[edge.source].lat,edge.r,edge.g,edge.b));
-			edge_vertices.push_back(Vertex_RGB(nodes[edge.target].lon,nodes[edge.target].lat,edge.r,edge.g,edge.b));
+			edge_vertices.push_back(Vertex_RGB(nodes[edge.source].lon,nodes[edge.source].lat,edge.r,edge.g,edge.b, edge.a));
+			edge_vertices.push_back(Vertex_RGB(nodes[edge.target].lon,nodes[edge.target].lat,edge.r,edge.g,edge.b, edge.a));
 
 			edge_indices.push_back(index_counter++);
 			edge_indices.push_back(index_counter++);
@@ -1852,7 +1881,7 @@ struct TriangleGraph
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(Vertex_RGB), 0);
 		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
+		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(Vertex_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -1874,9 +1903,9 @@ struct TriangleGraph
 		int triangle_counter = 0;
 		for(auto& triangle : triangles)
 		{
-			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v1].lon,nodes[triangle.v1].lat,triangle.r,triangle.g,triangle.b,triangle_counter));
-			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v2].lon,nodes[triangle.v2].lat,triangle.r,triangle.g,triangle.b,triangle_counter));
-			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v3].lon,nodes[triangle.v3].lat,triangle.r,triangle.g,triangle.b,triangle_counter));
+			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v1].lon,nodes[triangle.v1].lat,triangle.r,triangle.g,triangle.b,triangle_counter, triangle.a));
+			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v2].lon,nodes[triangle.v2].lat,triangle.r,triangle.g,triangle.b,triangle_counter, triangle.a));
+			triangle_vertices.push_back(Vertex_ID_RGB(nodes[triangle.v3].lon,nodes[triangle.v3].lat,triangle.r,triangle.g,triangle.b,triangle_counter, triangle.a));
 
 			triangle_indices.push_back(index_counter++);
 			triangle_indices.push_back(index_counter++);
@@ -1921,7 +1950,7 @@ struct TriangleGraph
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 1, GL_INT, false, sizeof(Vertex_ID_RGB), (GLvoid*) (sizeof(GL_FLOAT)*2));
 		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 3, GL_UNSIGNED_BYTE, true, sizeof(Vertex_ID_RGB), (GLvoid*) ((sizeof(GL_FLOAT)*2) + sizeof(GL_INT)) );
+		glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, true, sizeof(Vertex_ID_RGB), (GLvoid*) ((sizeof(GL_FLOAT)*2) + sizeof(GL_INT)) );
 
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
