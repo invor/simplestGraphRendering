@@ -12,6 +12,7 @@
 #include <memory>
 #include <map>
 #include <list>
+#include <cmath>
 
 typedef unsigned int uint;
 
